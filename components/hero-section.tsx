@@ -1,12 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function HeroSection() {
     return (
-        <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        <section className="relative pt-32 pb-20 px-6 overflow-hidden bg-slate-900">
             {/* Aurora Background */}
-            <div className="absolute inset-0 -z-10 bg-navy-900">
+            <div className="absolute inset-0 -z-10 bg-slate-900">
+                <div className="absolute top-0 left-0 right-0 h-[600px] bg-blue-500/30 blur-3xl rounded-full translate-y-[-50%] pointer-events-none" />
+
                 <motion.div
                     animate={{
                         scale: [1, 1.2, 1],
@@ -19,7 +22,7 @@ export default function HeroSection() {
                         repeatType: "reverse",
                         ease: "easeInOut",
                     }}
-                    className="absolute -top-[20%] -left-[10%] w-[140%] h-[140%] bg-gradient-radial from-blue-900 via-navy-900 to-transparent blur-3xl opacity-50"
+                    className="absolute -top-[20%] -left-[10%] w-[140%] h-[140%] bg-gradient-radial from-blue-900 via-slate-900 to-transparent blur-3xl opacity-50"
                 />
                 <motion.div
                     animate={{
@@ -68,16 +71,24 @@ export default function HeroSection() {
                     <span className="font-semibold text-white"> 로픽(LawPick) 멤버십</span>으로 예방하세요.
                 </motion.p>
 
-                <motion.button
+                <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     transition={{ duration: 0.2, delay: 0.6 }}
-                    className="w-full max-w-xs md:max-w-sm bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-2xl shadow-lg shadow-blue-500/30 text-lg"
+                    className="w-full max-w-xs md:max-w-sm"
                 >
-                    내 법률 위험도 무료 진단
-                </motion.button>
+                    <div className="space-y-4">
+                        <Link
+                            href="/diagnosis"
+                            className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-full text-lg shadow-xl shadow-blue-900/30 transition-all hover:scale-105"
+                        >
+                            내 법률 위험도 무료 진단
+                        </Link>
+                        <p className="text-slate-400 text-sm">
+                            * 3분 소요 / 별도 회원가입 없음
+                        </p>
+                    </div>
+                </motion.div>
             </div>
         </section>
     );

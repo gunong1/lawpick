@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, animate } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 
 type CounterProps = {
@@ -13,37 +13,25 @@ type CounterProps = {
 
 const Counter = ({ from, to, duration = 2, suffix = "", decimals = 0 }: CounterProps) => {
     const nodeRef = useRef<HTMLSpanElement>(null);
-    const inView = useInView(nodeRef, { once: true, margin: "-20%" });
-    const [hasAnimated, setHasAnimated] = useState(false);
+    const inView = useInView(nodeRef, { once: true }); // Removed negative margin
 
     useEffect(() => {
-        if (inView && !hasAnimated) {
-            setHasAnimated(true);
-            const node = nodeRef.current;
-            const controls = { value: from };
+        if (!inView) return;
 
-            let start: number;
-            const step = (timestamp: number) => {
-                if (!start) start = timestamp;
-                const progress = Math.min((timestamp - start) / (duration * 1000), 1);
+        const node = nodeRef.current;
+        if (!node) return;
 
-                // Ease out quart
-                const ease = 1 - Math.pow(1 - progress, 4);
+        // Use framer-motion's animate function for hardware-accelerated value interpolation
+        const controls = animate(from, to, {
+            duration: duration,
+            ease: "easeOut",
+            onUpdate(value) {
+                node.textContent = value.toFixed(decimals) + suffix;
+            },
+        });
 
-                const currentValue = from + (to - from) * ease;
-
-                if (node) {
-                    node.textContent = currentValue.toFixed(decimals) + suffix;
-                }
-
-                if (progress < 1) {
-                    requestAnimationFrame(step);
-                }
-            };
-
-            requestAnimationFrame(step);
-        }
-    }, [inView, from, to, duration, suffix, decimals, hasAnimated]);
+        return () => controls.stop();
+    }, [inView, from, to, duration, suffix, decimals]);
 
     return <span ref={nodeRef} className="tabular-nums">{from.toFixed(decimals) + suffix}</span>;
 };

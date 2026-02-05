@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Footer from "@/components/footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,8 +24,9 @@ export default function RootLayout({
     return (
         <html lang="ko">
             <body className="flex justify-center min-h-screen bg-neutral-50">
-                <main className="w-full min-h-screen bg-white relative">
+                <main className="w-full min-h-screen bg-slate-50 relative">
                     {children}
+                    <Footer />
                 </main>
             </body>
         </html>

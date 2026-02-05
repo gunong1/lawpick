@@ -9,10 +9,11 @@ export default function Header() {
                 <Link href="/" className="flex items-center gap-1 group">
                     <div className="relative h-8 w-32 md:h-10 md:w-40">
                         <Image
-                            src="/logo.jpg"
+                            src="/logo-new.png"
                             alt="LawPick Logo"
-                            fill
-                            className="object-contain object-left"
+                            width={120} // Adjusted width for the new aspect ratio
+                            height={32}
+                            className="h-8 w-auto object-contain"
                             priority
                         />
                     </div>

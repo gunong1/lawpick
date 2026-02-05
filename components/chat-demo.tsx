@@ -1,120 +1,112 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-
-type Message = {
-    id: number;
-    text: string;
-    sender: "user" | "ai";
-    isTyping?: boolean;
-};
+import { useChat } from "ai/react";
+import { useEffect, useRef } from "react";
+import { Bot, User, Send } from "lucide-react";
+import clsx from "clsx";
 
 export default function ChatDemo() {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: 1,
-            text: "안녕하세요! 어떤 법률 고민이 있으신가요?",
-            sender: "ai",
-        },
-    ]);
-    const [isTyping, setIsTyping] = useState(false);
-    const [hasInteracted, setHasInteracted] = useState(false);
+    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+        initialMessages: [
+            {
+                id: 'welcome',
+                role: 'assistant',
+                content: '안녕하세요! 로픽(LawPick) AI 변호사입니다. \n전세 사기, 교통사고 등 걱정되는 법률 문제가 있으신가요?',
+            }
+        ]
+    });
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    // Auto-scroll to bottom using scrollTop to prevent window jumping
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        if (messages.length > 1 && scrollRef.current) {
+            const { scrollHeight, clientHeight } = scrollRef.current;
+            scrollRef.current.scrollTo({
+                top: scrollHeight - clientHeight,
+                behavior: "smooth",
+            });
         }
-    }, [messages, isTyping]);
-
-    const handleUserClick = () => {
-        if (hasInteracted) return;
-
-        setHasInteracted(true);
-        const userMsg: Message = {
-            id: 2,
-            text: "전세금을 못 받고 있어... 도와줘!",
-            sender: "user",
-        };
-
-        setMessages((prev) => [...prev, userMsg]);
-        setIsTyping(true);
-
-        setTimeout(() => {
-            setIsTyping(false);
-            const aiMsg: Message = {
-                id: 3,
-                text: "걱정하지 마세요. 임차권 등기 명령 신청부터 보증금 반환 소송까지 절차를 알려드릴게요. 우선 계약서 사진을 찍어주실 수 있나요?",
-                sender: "ai",
-            };
-            setMessages((prev) => [...prev, aiMsg]);
-        }, 1500);
-    };
+    }, [messages]);
 
     return (
-        <section className="px-5 py-12 bg-slate-50">
-            <div className="max-w-7xl mx-auto">
-                <h2 className="text-2xl md:text-3xl font-bold text-navy-900 mb-8 text-center">
-                    AI 법률 비서와 <br className="md:hidden" />
-                    <span className="text-blue-500"> 24시간 상담</span>해보세요
-                </h2>
+        <section className="bg-slate-50 py-10">
+            <div className="px-6 max-w-md mx-auto w-full">
+                <h3 className="text-xl font-bold text-navy-900 mb-6 text-center">
+                    AI 변호사에게 물어보세요
+                </h3>
 
-                <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-                    {/* Chat Screen */}
-                    <div
-                        ref={scrollRef}
-                        className="h-80 bg-slate-50 p-4 overflow-y-auto scroll-smooth no-scrollbar flex flex-col gap-3"
-                    >
-                        {messages.map((msg) => (
+                <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col h-[500px]">
+                    {/* Chat Window */}
+                    <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 no-scrollbar">
+                        {messages.map((m) => (
                             <div
-                                key={msg.id}
-                                className={`flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"
-                                    }`}
+                                key={m.id}
+                                className={clsx(
+                                    "flex items-start gap-3 max-w-[85%]",
+                                    m.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+                                )}
                             >
                                 <div
-                                    className={`max-w-[85%] px-5 py-3 text-sm md:text-base rounded-2xl shadow-sm ${msg.sender === "user"
-                                            ? "bg-blue-500 text-white rounded-br-none"
-                                            : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
-                                        }`}
+                                    className={clsx(
+                                        "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm",
+                                        m.role === "user" ? "bg-navy-900" : "bg-blue-500"
+                                    )}
                                 >
-                                    {msg.text}
+                                    {m.role === "user" ? (
+                                        <User className="w-5 h-5 text-white" />
+                                    ) : (
+                                        <Bot className="w-5 h-5 text-white" />
+                                    )}
+                                </div>
+                                <div
+                                    className={clsx(
+                                        "p-3 rounded-2xl text-sm leading-relaxed shadow-sm",
+                                        m.role === "user"
+                                            ? "bg-navy-900 text-white rounded-tr-none"
+                                            : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
+                                    )}
+                                    style={{ whiteSpace: "pre-wrap" }}
+                                >
+                                    {m.content}
                                 </div>
                             </div>
                         ))}
-
-                        {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="bg-white px-4 py-4 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex gap-1.5 items-center">
-                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
-                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
-                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                        {isLoading && (
+                            <div className="flex items-start gap-3 mr-auto">
+                                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                    <Bot className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-100">
+                                    <span className="flex gap-1">
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                    </span>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Input Area (Fake) */}
-                    {!hasInteracted ? (
-                        <div className="p-4 bg-white border-t border-slate-100">
-                            <button
-                                onClick={handleUserClick}
-                                className="w-full bg-navy-900/5 hover:bg-navy-900/10 text-navy-900 py-3.5 px-5 rounded-xl text-sm md:text-base font-medium transition-colors flex items-center justify-between group"
-                            >
-                                <span>전세금을 못 받고 있어...</span>
-                                <div className="w-7 h-7 bg-navy-900 text-white rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                        <path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" />
-                                    </svg>
-                                </div>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="p-4 bg-white border-t border-slate-100">
-                            <div className="w-full h-12 bg-slate-100 rounded-xl flex items-center px-4 text-slate-400 text-sm md:text-base">
-                                메시지를 입력하세요...
-                            </div>
-                        </div>
-                    )}
+                    {/* Input Area */}
+                    <form
+                        onSubmit={handleSubmit}
+                        className="p-3 bg-white border-t border-slate-100 flex items-center gap-2"
+                    >
+                        <input
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 placeholder:text-slate-400"
+                            value={input}
+                            placeholder="예: 전세보증금을 돌려받지 못하고 있어요..."
+                            onChange={handleInputChange}
+                        />
+                        <button
+                            type="submit"
+                            disabled={isLoading || !input.trim()}
+                            className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md disabled:bg-slate-300 disabled:shadow-none transition-all hover:bg-blue-700"
+                        >
+                            <Send className="w-5 h-5 ml-0.5" />
+                        </button>
+                    </form>
                 </div>
             </div>
         </section>
