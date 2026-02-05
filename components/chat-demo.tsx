@@ -16,7 +16,7 @@ export default function ChatDemo() {
         // ]
     }) as any;
 
-    const { messages, input = "", handleInputChange, handleSubmit, isLoading } = chatHelpers;
+    const { messages, input = "", handleInputChange, handleSubmit, isLoading, append } = chatHelpers;
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +41,39 @@ export default function ChatDemo() {
                 <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col h-[500px]">
                     {/* Chat Window */}
                     <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 no-scrollbar">
+                        {messages.length === 0 && (
+                            <div className="space-y-4">
+                                {/* Welcome Message */}
+                                <div className="flex items-start gap-3 mr-auto max-w-[85%]">
+                                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                        <Bot className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="bg-white p-3 rounded-2xl rounded-tl-none text-slate-700 border border-slate-100 text-sm leading-relaxed shadow-sm">
+                                        안녕하세요! 로픽 AI 변호사 제미나입니다.<br />
+                                        무엇을 도와드릴까요?
+                                    </div>
+                                </div>
+
+                                {/* Suggestion Chips */}
+                                <div className="pl-11 grid grid-cols-1 gap-2">
+                                    {[
+                                        "🏠 전세 보증금 반환",
+                                        "🚗 교통사고 과실 비율",
+                                        "💰 중고거래 사기 신고",
+                                        "📝 차용증 작성법"
+                                    ].map((text) => (
+                                        <button
+                                            key={text}
+                                            onClick={() => append({ role: "user", content: text })}
+                                            className="text-left px-4 py-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 transition-colors shadow-sm hover:shadow-md"
+                                        >
+                                            {text}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {messages.map((m: any) => (
                             <div
                                 key={m.id}

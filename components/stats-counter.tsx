@@ -75,7 +75,7 @@ export default function StatsCounter() {
                         className="flex flex-col items-center text-center p-4"
                     >
                         <span className="text-4xl font-bold text-blue-500 mb-2">
-                            24/7
+                            365일 24시간
                         </span>
                         <span className="text-slate-500 text-sm font-medium">실시간 AI 상담 가동</span>
                     </motion.div>
