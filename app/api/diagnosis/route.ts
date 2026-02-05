@@ -7,11 +7,16 @@ export async function POST(req: Request) {
     try {
         const { answers } = await req.json();
 
+        console.log("Diagnosis Request Answers:", answers);
+        const hasKey = !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        console.log("Has API Key:", hasKey);
+
         if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+            console.error("Diagnosis Error: API Key Missing");
             return new Response(JSON.stringify({
                 score: 0,
-                riskLevel: "설정 필요",
-                summary: "API 키가 설정되지 않았습니다."
+                riskLevel: "오류",
+                summary: "API 키가 설정되지 않았습니다 (서버 설정 확인 필요)."
             }), { status: 500 });
         }
 
@@ -38,6 +43,8 @@ export async function POST(req: Request) {
             prompt: `Analyze this user profile:\n${profile}`,
         });
 
+        console.log("AI Response Text:", text);
+
         // Strip any potential markdown code blocks if the AI behaves unexpectedly
         const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
@@ -46,11 +53,11 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error("Diagnosis Error:", error);
+        console.error("Diagnosis Runtime Error:", error);
         return new Response(JSON.stringify({
             score: 50,
             riskLevel: "오류",
-            summary: "진단 중 오류가 발생했습니다. 다시 시도해 주세요."
+            summary: "진단 시스템 오류: " + (error?.message || "알 수 없는 오류")
         }), { status: 500 });
     }
 }

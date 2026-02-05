@@ -1,27 +1,30 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, User, Send } from "lucide-react";
 import clsx from "clsx";
 
 export default function ChatDemo() {
-    // Destructure append explicitly as requested
+    // Manual State Management for reliability
+    const [inputValue, setInputValue] = useState("");
+
+    // Destructure only what we strictly need
     const chatHelpers = useChat({
         api: "/api/chat",
         onError: (error: any) => {
             console.error("Chat Error:", error);
-            alert("채팅 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+            alert("채팅 중 오류가 발생했습니다: " + (error?.message || "Unknown error"));
         }
     } as any) as any;
 
-    const { messages, input = "", handleInputChange, handleSubmit, isLoading, append } = chatHelpers;
+    const { messages, isLoading, append } = chatHelpers;
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll logic
     useEffect(() => {
-        if (messages.length > 0 && scrollRef.current) {
+        if (messages?.length > 0 && scrollRef.current) {
             const { scrollHeight, clientHeight } = scrollRef.current;
             scrollRef.current.scrollTo({
                 top: scrollHeight - clientHeight,
@@ -29,6 +32,24 @@ export default function ChatDemo() {
             });
         }
     }, [messages]);
+
+    const handleFormSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inputValue.trim() || isLoading) return;
+
+        const text = inputValue;
+        setInputValue(""); // Clear input immediately
+
+        try {
+            await append({
+                role: "user",
+                content: text
+            });
+        } catch (err) {
+            console.error("Append Error:", err);
+            setInputValue(text); // Restore on error
+        }
+    };
 
     const suggestedQuestions = [
         "🏠 전세 보증금 반환",
@@ -48,7 +69,7 @@ export default function ChatDemo() {
                     {/* Chat Window */}
                     <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 no-scrollbar">
                         {/* Empty State / Welcome */}
-                        {messages.length === 0 && (
+                        {(!messages || messages.length === 0) && (
                             <div className="space-y-4">
                                 <div className="flex items-start gap-3 mr-auto max-w-[85%]">
                                     <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -77,7 +98,7 @@ export default function ChatDemo() {
                         )}
 
                         {/* Message List */}
-                        {messages.map((m: any) => (
+                        {messages && messages.map((m: any) => (
                             <div
                                 key={m.id}
                                 className={clsx(
@@ -131,18 +152,18 @@ export default function ChatDemo() {
 
                     {/* Input Area */}
                     <form
-                        onSubmit={handleSubmit}
+                        onSubmit={handleFormSubmit}
                         className="p-3 bg-white border-t border-slate-100 flex items-center gap-2"
                     >
                         <input
                             className="flex-1 bg-slate-50 border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 placeholder:text-slate-400"
-                            value={input}
+                            value={inputValue}
                             placeholder="예: 전세보증금을 돌려받지 못하고 있어요..."
-                            onChange={handleInputChange}
+                            onChange={(e) => setInputValue(e.target.value)}
                         />
                         <button
                             type="submit"
-                            disabled={isLoading || !input.trim()}
+                            disabled={isLoading || !inputValue.trim()}
                             className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md disabled:bg-slate-300 disabled:shadow-none transition-all hover:bg-blue-700"
                         >
                             <Send className="w-5 h-5 ml-0.5" />
