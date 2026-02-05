@@ -16,7 +16,7 @@ export default function ChatDemo() {
         // ]
     }) as any;
 
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = chatHelpers;
+    const { messages, input = "", handleInputChange, handleSubmit, isLoading } = chatHelpers;
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +41,7 @@ export default function ChatDemo() {
                 <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col h-[500px]">
                     {/* Chat Window */}
                     <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 no-scrollbar">
-                        {messages.map((m) => (
+                        {messages.map((m: any) => (
                             <div
                                 key={m.id}
                                 className={clsx(
