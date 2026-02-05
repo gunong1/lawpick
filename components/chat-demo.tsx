@@ -7,13 +7,15 @@ import clsx from "clsx";
 
 export default function ChatDemo() {
     // Destructure append explicitly as requested
-    const { messages, input, handleInputChange, handleSubmit, isLoading, append } = useChat({
+    const chatHelpers = useChat({
         api: "/api/chat",
-        onError: (error) => {
+        onError: (error: any) => {
             console.error("Chat Error:", error);
             alert("채팅 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
         }
-    });
+    } as any) as any;
+
+    const { messages, input = "", handleInputChange, handleSubmit, isLoading, append } = chatHelpers;
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +66,7 @@ export default function ChatDemo() {
                                         <button
                                             key={text}
                                             type="button"
-                                            onClick={() => append({ role: "user", content: text })}
+                                            onClick={() => void append({ role: "user", content: text })}
                                             className="text-left px-4 py-3 bg-white hover:bg-blue-50 cursor-pointer border border-slate-200 rounded-xl text-sm text-slate-700 transition-colors shadow-sm hover:shadow-md"
                                         >
                                             {text}
@@ -75,7 +77,7 @@ export default function ChatDemo() {
                         )}
 
                         {/* Message List */}
-                        {messages.map((m) => (
+                        {messages.map((m: any) => (
                             <div
                                 key={m.id}
                                 className={clsx(
