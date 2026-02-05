@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Header from "@/components/header";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, AlertTriangle, ShieldCheck } from "lucide-react";
 
@@ -64,6 +65,7 @@ export default function DiagnosisPage() {
     if (result) {
         return (
             <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white">
+                <Header />
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -111,6 +113,7 @@ export default function DiagnosisPage() {
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
+                <Header />
                 <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
                 <h2 className="text-2xl font-bold animate-pulse">AI 변호사가 분석 중입니다...</h2>
             </div>
@@ -120,6 +123,7 @@ export default function DiagnosisPage() {
     // Question View
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+            <Header />
             {/* Progress Bar */}
             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800">
                 <motion.div

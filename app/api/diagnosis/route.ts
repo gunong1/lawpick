@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     `;
 
         const { text } = await generateText({
-            model: google("gemini-2.0-flash"), // Using the verified working model
+            model: google("gemini-1.5-flash"), // Using 1.5-flash for better stability (less rate limiting)
             system: `You are a legal risk analyst. Analyze the user's profile based on their answers.
       
       Risk Factors:
