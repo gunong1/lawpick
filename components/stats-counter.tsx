@@ -51,7 +51,7 @@ export default function StatsCounter() {
                         <span className="text-4xl font-bold text-navy-900 mb-2">
                             <Counter from={0} to={14203} suffix="+" />
                         </span>
-                        <span className="text-slate-500 text-sm font-medium">누적 진단 건수</span>
+                        <span className="text-slate-500 text-sm font-medium">AI 학습 판례 데이터</span>
                     </motion.div>
 
                     <motion.div
@@ -64,7 +64,7 @@ export default function StatsCounter() {
                         <span className="text-4xl font-bold text-navy-900 mb-2">
                             <Counter from={0} to={50} suffix="+" />
                         </span>
-                        <span className="text-slate-500 text-sm font-medium">파트너 변호사</span>
+                        <span className="text-slate-500 text-sm font-medium">진단 가능 법률 분야</span>
                     </motion.div>
 
                     <motion.div
@@ -75,10 +75,9 @@ export default function StatsCounter() {
                         className="flex flex-col items-center text-center p-4"
                     >
                         <span className="text-4xl font-bold text-blue-500 mb-2">
-                            <Counter from={0} to={4.9} decimals={1} suffix="" />
-                            <span className="text-2xl text-slate-300 ml-1">/ 5.0</span>
+                            24/7
                         </span>
-                        <span className="text-slate-500 text-sm font-medium">평균 만족도</span>
+                        <span className="text-slate-500 text-sm font-medium">실시간 AI 상담 가동</span>
                     </motion.div>
                 </div>
             </div>

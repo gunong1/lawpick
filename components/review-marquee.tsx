@@ -15,7 +15,7 @@ export default function ReviewMarquee() {
         <section className="py-16 bg-slate-50 overflow-hidden">
             <div className="max-w-7xl mx-auto px-6 mb-10 text-center">
                 <h2 className="text-2xl font-bold text-navy-900">
-                    이미 <span className="text-blue-500">1.4만 명</span>이 로픽을 선택했습니다
+                    AI가 <span className="text-blue-500">1.4만 건</span>의 판례를 완벽하게 분석했습니다
                 </h2>
             </div>
 
