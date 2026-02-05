@@ -64,8 +64,9 @@ export default function ChatDemo() {
                                     ].map((text) => (
                                         <button
                                             key={text}
-                                            onClick={() => append({ role: "user", content: text })}
-                                            className="text-left px-4 py-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 transition-colors shadow-sm hover:shadow-md"
+                                            type="button"
+                                            onClick={() => void append({ role: "user", content: text })}
+                                            className="text-left px-4 py-3 bg-white hover:bg-blue-50 cursor-pointer border border-slate-200 rounded-xl text-sm text-slate-700 transition-colors shadow-sm hover:shadow-md"
                                         >
                                             {text}
                                         </button>
