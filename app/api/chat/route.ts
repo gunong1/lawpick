@@ -23,7 +23,7 @@ export async function POST(req: Request) {
             messages,
         });
 
-        return result.toDataStreamResponse();
+        return result.toTextStreamResponse();
     } catch (error: any) {
         console.error("Detailed AI Error:", error);
         const errorMessage = error.message || "Unknown AI Error";

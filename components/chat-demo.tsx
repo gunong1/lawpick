@@ -1,20 +1,22 @@
 "use client";
 
-import { useChat } from "ai/react";
+import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef } from "react";
 import { Bot, User, Send } from "lucide-react";
 import clsx from "clsx";
 
 export default function ChatDemo() {
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-        initialMessages: [
-            {
-                id: 'welcome',
-                role: 'assistant',
-                content: '안녕하세요! 로픽(LawPick) AI 변호사입니다. \n전세 사기, 교통사고 등 걱정되는 법률 문제가 있으신가요?',
-            }
-        ]
-    });
+    const chatHelpers = useChat({
+        // initialMessages: [
+        //     {
+        //         id: 'welcome',
+        //         role: 'assistant',
+        //         content: '안녕하세요! 로픽(LawPick) AI 변호사입니다. \n전세 사기, 교통사고 등 걱정되는 법률 문제가 있으신가요?',
+        //     }
+        // ]
+    }) as any;
+
+    const { messages, input, handleInputChange, handleSubmit, isLoading } = chatHelpers;
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
