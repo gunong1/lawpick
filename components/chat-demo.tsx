@@ -1,30 +1,25 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useState } from "react";
 import { Bot, User, Send } from "lucide-react";
 import clsx from "clsx";
 
+type Message = {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+};
+
 export default function ChatDemo() {
-    // Manual State Management for reliability
+    const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
-
-    // Destructure only what we strictly need
-    const chatHelpers = useChat({
-        api: "/api/chat",
-        onError: (error: any) => {
-            console.error("Chat Error:", error);
-            alert("채팅 중 오류가 발생했습니다: " + (error?.message || "Unknown error"));
-        }
-    } as any) as any;
-
-    const { messages, isLoading, append } = chatHelpers;
+    const [isLoading, setIsLoading] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll logic
     useEffect(() => {
-        if (messages?.length > 0 && scrollRef.current) {
+        if (messages.length > 0 && scrollRef.current) {
             const { scrollHeight, clientHeight } = scrollRef.current;
             scrollRef.current.scrollTo({
                 top: scrollHeight - clientHeight,
@@ -33,22 +28,54 @@ export default function ChatDemo() {
         }
     }, [messages]);
 
-    const handleFormSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!inputValue.trim() || isLoading) return;
+    const sendMessage = async (content: string) => {
+        if (!content.trim() || isLoading) return;
 
-        const text = inputValue;
-        setInputValue(""); // Clear input immediately
+        const userMessage: Message = {
+            id: Date.now().toString(),
+            role: "user",
+            content: content
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        setInputValue("");
+        setIsLoading(true);
 
         try {
-            await append({
-                role: "user",
-                content: text
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    messages: [...messages, userMessage]
+                })
             });
-        } catch (err) {
-            console.error("Append Error:", err);
-            setInputValue(text); // Restore on error
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to fetch response");
+            }
+
+            const data = await response.json();
+
+            const aiMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: data.text
+            };
+
+            setMessages(prev => [...prev, aiMessage]);
+
+        } catch (error: any) {
+            console.error("Chat Error:", error);
+            alert("채팅 오류: " + error.message);
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        sendMessage(inputValue);
     };
 
     const suggestedQuestions = [
@@ -69,7 +96,7 @@ export default function ChatDemo() {
                     {/* Chat Window */}
                     <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50 no-scrollbar">
                         {/* Empty State / Welcome */}
-                        {(!messages || messages.length === 0) && (
+                        {messages.length === 0 && (
                             <div className="space-y-4">
                                 <div className="flex items-start gap-3 mr-auto max-w-[85%]">
                                     <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -87,7 +114,7 @@ export default function ChatDemo() {
                                         <button
                                             key={text}
                                             type="button"
-                                            onClick={() => void append({ role: "user", content: text })}
+                                            onClick={() => sendMessage(text)}
                                             className="text-left px-4 py-3 bg-white hover:bg-blue-50 cursor-pointer border border-slate-200 rounded-xl text-sm text-slate-700 transition-colors shadow-sm hover:shadow-md"
                                         >
                                             {text}
@@ -98,7 +125,7 @@ export default function ChatDemo() {
                         )}
 
                         {/* Message List */}
-                        {messages && messages.map((m: any) => (
+                        {messages.map((m) => (
                             <div
                                 key={m.id}
                                 className={clsx(
