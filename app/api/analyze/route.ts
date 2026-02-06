@@ -5,83 +5,62 @@ export const maxDuration = 30;
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '');
 
-const SYSTEM_PROMPT = `당신은 법률 분쟁 분석 전문 AI입니다.
+const SYSTEM_PROMPT = `당신은 대한민국 법률 분쟁 분석 전문 AI입니다.
+사용자의 사연을 분석하여 아래 JSON 형식으로만 답변하세요.
 
-⚠️⚠️⚠️ [치명적 규칙] 아래를 어기면 분석 실패 ⚠️⚠️⚠️
+[분류 기준]
+- RENTAL: 부동산/임대차 (보증금, 월세, 명도)
+- MONEY: 금전/채권 (대여금, 용역비)
+- LABOR: 노동 (임금체불, 부당해고)
+- CONSUMER: 소비자 (환불, 하자)
+- CYBER: 명예훼손/악플
+- TRAFFIC: 교통사고
+- FAMILY: 가정/상속
+- CRIME: 형사 (사기, 폭행, 협박)
+- NOISE: 층간소음
+- OTHER: 기타
 
-===== [예시] 반드시 이 패턴대로 출력 =====
+⚠️⚠️⚠️ [역할 판단 - 매우 중요!!!] ⚠️⚠️⚠️
 
-**[입력 예시]**
-"집주인입니다. 세입자가 원상복구비 200만 원 안 주고 도망갔어요. 월세도 3달 밀렸고요."
+★★★ 의뢰인 판단 핵심 규칙 ★★★
+1. 누가 "피해를 입었다"고 호소하는가? → 그 사람이 의뢰인
+2. 누가 "돈을 받아야 한다"고 주장하는가? → 그 사람이 의뢰인
+3. "~에게" 패턴 확인: "집주인에게 연락했다" → 의뢰인은 세입자
 
-**[올바른 출력 ✅]**
+[임대차 역할 판단 상세]
+- 세입자(임차인)가 의뢰인인 경우:
+  * "집주인에게 ~했다" (집주인에게 문자/연락/요청)
+  * "보증금을 못 받을까봐" / "보증금 안 줌" / "보증금 못 줄 수도"
+  * "전세 만기" + "이사" + "보증금 걱정"
+  * "내용증명 보내야 할까요?" (보증금 반환 관련)
+  
+- 집주인(임대인)이 의뢰인인 경우:
+  * "세입자가 월세를 안 냄" / "차임 연체"
+  * "세입자가 도망감" / "잠적"
+  * "세입자를 내보내고 싶다"
+  * "명도 소송"
+
+[금액 규칙]
+- 본문에 나온 숫자를 정확히 추출 (예: "500만 원" → "500만 원")
+- 월세 합산 허용: "월 80만 원 × 4개월" → "320만 원"
+- 금액이 없으면 "해당 없음"
+
+[출력 형식 - JSON만, 마크다운 금지]
 {
-  "caseBrief": "의뢰인(**임대인**)은 임차인으로부터 연체 차임 및 원상복구비 200만 원을 청구하는 사안입니다.",
+  "score": 75,
+  "type": "WARNING",
+  "category": "RENTAL",
+  "caseBrief": "임차인이 전세 만기 시 보증금 반환을 요청하는 사안",
+  "legalCategories": ["보증금반환청구", "임차권등기명령", "전세권설정"],
   "keyFacts": {
-    "who": "의뢰인: 임대인 / 상대방: 임차인",
-    "money": "원상복구비 200만 원, 연체 차임 3개월분(금액 미상)"
+    "who": "의뢰인: 임차인(세입자) / 상대방: 임대인(집주인)",
+    "when": "전세 계약 만기 2개월 전",
+    "money": "해당 없음",
+    "evidenceStatus": "문자 내역 보유"
   },
-  "legalCategories": ["차임지급청구", "원상복구비청구", "명도소송"]
-}
-
-**[잘못된 출력 ❌ - 절대 이렇게 하지 마세요]**
-{
-  "caseBrief": "의뢰인(임차인)은 임대인으로부터 임대차보증금 600만 원을 반환받지 못하는 사안입니다.",
-  // ↑ 오류 1: 집주인이라고 했는데 "임차인"으로 표기
-  // ↑ 오류 2: 원상복구비 200만 원을 "보증금 600만 원"으로 변환 (엉터리 계산)
-  // ↑ 오류 3: 집주인이 보증금 반환? 청구 유형 자체가 틀림
-  "keyFacts": {
-    "who": "의뢰인: 임차인 / 상대방: 임대인",  // ← 역할 뒤바뀜!
-    "money": "총 600만 원 (월 200만 원 × 3개월)"  // ← 원상복구비≠월세, 계산 금지!
-  }
-}
-
-===== 역할 판정 규칙 =====
-
-| 입력 키워드 | user_role | caseBrief 표기 | 상대방 |
-|-------------|-----------|----------------|--------|
-| "집주인", "임대인", "세입자가 안 냄" | LANDLORD | 의뢰인(**임대인**) | 임차인 |
-| "세입자", "전세금 안 줌", "보증금" | TENANT | 의뢰인(**임차인**) | 임대인 |
-| "빌려줬는데" | CREDITOR | 의뢰인(**채권자**) | 채무자 |
-
-===== 금액 규칙 =====
-- "원상복구비 200만 원" → damage_cost (월세 아님!)
-- "월세 3달 밀림" + 월세 금액 없음 → "연체 차임 3개월분(금액 미상)"
-- ❌ 금지: "월 200만 원 × 3개월 = 600만 원" 같은 추측 계산
-
-===== 용어 사용 =====
-- LANDLORD일 때: 차임지급청구, 명도소송, 원상복구비청구
-- TENANT일 때: 보증금반환, 임차권등기명령
-
-[Output Format - JSON만]
-{
-  "score": 0-100,
-  "type": "SAFE | WARNING | CRITICAL",
-  "caseBrief": "의뢰인(임대인/임차인)은 ...",
-  "legalCategories": ["역할에 맞는 용어"],
-  "keyFacts": {
-    "who": "의뢰인: [역할] / 상대방: [역할]",
-    "when": "시기",
-    "money": "확정 금액만",
-    "evidenceStatus": "증거 상태"
-  },
-  "riskReason": "위험도 이유",
-  "actionItems": ["조치 목록"]
-}
-
-[점수]
-- 0: 정보 부족 / 판단 불가 (예: "사기 당함", "힘들다" 등 구체적 사실관계 없음)
-- 10-30: SAFE (단순 상담, 법적 위험 낮음)
-- 31-70: WARNING (내용증명 등 조치 필요)
-- 71-100: CRITICAL (시급한 대응, 소송/형사고소 필요)
-
-===== [중요] 정보 부족 시 처리 =====
-입력 내용이 너무 모호하거나 구체적인 사실관계(누가, 언제, 무엇을, 어떻게)가 부족하여 법적 판단을 내리기 어려운 경우:
-- score: 0
-- type: "SAFE"
-- caseBrief: "입력된 정보가 부족하여 법적 분석이 어렵습니다. 구체적인 사실위주로 다시 작성해주세요."
-- riskReason: "구체적인 사실관계(피해 금액, 상대방의 행위, 날짜 등)가 파악되지 않아 위험도를 산정할 수 없습니다."
-- actionItems: ["육하원칙에 따라 다시 작성", "계약서 등 증거 자료 확인"]`;
+  "riskReason": "임대인이 보증금 반환을 회피할 가능성이 있음",
+  "actionItems": ["내용증명 발송 (보증금 반환 요청)", "임차권등기명령 준비", "보증보험 확인", "전세보증금반환보증 가입 여부 확인"]
+}`;
 
 export async function POST(req: Request) {
     try {
@@ -90,8 +69,51 @@ export async function POST(req: Request) {
         if (!content || content.trim().length < 10) {
             return Response.json({
                 success: false,
-                error: '분석할 내용이 너무 짧습니다. 더 구체적으로 입력해주세요.'
+                error: '분석할 내용이 너무 짧습니다. 구체적으로 입력해주세요.'
             });
+        }
+
+        // =====================================================
+        // [필터 1] 법적 분쟁 여부 검사
+        // =====================================================
+        const legalKeywords = [
+            // 금전/채권
+            '돈', '원', '만원', '억', '빌려', '갚', '못 받', '안 받', '안 줘', '못 줘', '채무', '채권', '변제',
+            // 임대차
+            '보증금', '월세', '전세', '집주인', '세입자', '임대', '임차', '명도', '퇴거', '계약',
+            // 사기/범죄
+            '사기', '피해', '고소', '고발', '경찰', '수사', '범죄', '폭행', '협박', '횡령', '배임',
+            // 노동
+            '월급', '임금', '급여', '알바', '체불', '해고', '퇴직금', '노동',
+            // 명예훼손
+            '명예훼손', '모욕', '악플', '비방', '욕설',
+            // 소비자/계약
+            '환불', '하자', '불량', '취소', '위약금', '손해', '배상',
+            // 가정/교통
+            '이혼', '양육', '상속', '교통사고', '치료비', '합의금',
+            // 기타 법적 표현
+            '소송', '법원', '변호사', '내용증명', '합의', '분쟁', '피해자', '가해자', '신고'
+        ];
+
+        const hasLegalContent = legalKeywords.some(keyword => content.includes(keyword));
+
+        if (!hasLegalContent) {
+            // 법적 분쟁이 아닌 일상 대화
+            const noLegalIssue: DetailedAnalysis = {
+                score: 0,
+                type: 'SAFE',
+                caseBrief: '법적 분쟁 사안이 아닙니다.',
+                legalCategories: [],
+                keyFacts: {
+                    who: '-',
+                    when: '-',
+                    money: '-',
+                    evidenceStatus: '-'
+                },
+                riskReason: '입력하신 내용에서 법적 분쟁 요소가 감지되지 않았습니다. 구체적인 피해 상황, 금액, 상대방 정보 등을 포함하여 다시 작성해주세요.',
+                actionItems: []
+            };
+            return Response.json({ success: true, data: noLegalIssue });
         }
 
         try {
@@ -99,112 +121,43 @@ export async function POST(req: Request) {
 
             const result = await model.generateContent([
                 { text: SYSTEM_PROMPT },
-                { text: `다음 상황을 분석해주세요:\n\n${content}` }
+                { text: `[사용자 사연]\n${content}\n\n위 내용을 분석해서 JSON으로만 답변해. 마크다운 코드블록 없이 순수 JSON만.` }
             ]);
 
             const responseText = result.response.text();
+            console.log('[AI Response]', responseText.substring(0, 500));
 
-            // JSON 파싱 시도
-            let analysisData: DetailedAnalysis;
-            try {
-                // JSON 블록 추출 (```json ... ``` 형태일 수 있음)
-                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) {
-                    throw new Error('JSON 형식을 찾을 수 없습니다');
-                }
-                const parsed = JSON.parse(jsonMatch[0]);
+            // JSON 파싱 (마크다운 제거)
+            const cleanJson = responseText.replace(/```json|```/g, '').trim();
+            const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
 
-                // 타입 검증 및 기본값 설정
-                analysisData = {
-                    score: Math.min(100, Math.max(0, parsed.score || 50)),
-                    type: ['SAFE', 'WARNING', 'CRITICAL'].includes(parsed.type) ? parsed.type : 'WARNING',
-                    caseBrief: parsed.caseBrief || '사건 내용을 분석 중입니다.',
-                    legalCategories: Array.isArray(parsed.legalCategories) ? parsed.legalCategories : ['일반 법률 상담'],
-                    keyFacts: {
-                        who: parsed.keyFacts?.who || '미상',
-                        when: parsed.keyFacts?.when || '미상',
-                        money: parsed.keyFacts?.money || '미상',
-                        evidenceStatus: parsed.keyFacts?.evidenceStatus || '확인 필요'
-                    },
-                    riskReason: parsed.riskReason || '추가 정보가 필요합니다.',
-                    actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : ['전문가 상담 권장']
-                };
-
-                console.log('--- [DEBUG] Content:', content.substring(0, 50) + '...');
-                console.log('--- [DEBUG] AI Raw Output (caseBrief):', analysisData.caseBrief);
-                console.log('--- [DEBUG] AI Raw Output (keyFacts.who):', analysisData.keyFacts.who);
-
-                // ⚠️ [후처리] AI 응답 강제 수정 - 역할 판정 오류 교정
-                const isLandlord = /집주인|임대인|세입자가.*안|월세.*밀|차임.*연체/.test(content);
-                const isTenant = /세입자입니다|전세금.*안|보증금.*안.*줌/.test(content);
-
-                console.log('--- [DEBUG] isLandlord:', isLandlord, 'isTenant:', isTenant);
-
-                if (isLandlord && !isTenant) {
-                    console.log('--- [DEBUG] Landlord Logic Triggered');
-                    // 집주인인데 AI가 임차인으로 잘못 판정한 경우 강제 수정
-                    if (analysisData.caseBrief.includes('임차인)은')) {
-                        analysisData.caseBrief = analysisData.caseBrief.replace('임차인)은', '임대인)은');
-                    }
-                    if (analysisData.caseBrief.includes('집주인으로부터') || analysisData.caseBrief.includes('임대인으로부터')) {
-                        analysisData.caseBrief = analysisData.caseBrief.replace(/집주인으로부터|임대인으로부터/g, '임차인으로부터');
-                    }
-                    if (analysisData.keyFacts.who.includes('임차인') && analysisData.keyFacts.who.includes('의뢰인')) {
-                        analysisData.keyFacts.who = '의뢰인: 임대인 / 상대방: 임차인';
-                    }
-
-                    // 보증금반환 → 차임청구로 수정 (집주인은 보증금 청구 안함)
-                    if (analysisData.caseBrief.includes('보증금') && analysisData.caseBrief.includes('반환')) {
-                        analysisData.caseBrief = analysisData.caseBrief.replace(/임대차보증금.*반환/g, '연체 차임 및 원상복구비 지급');
-                    }
-                }
-
-                // ⚠️ [후처리] 금액 계산 오류 수정
-                const monthlyRentMatch = content.match(/월세\s*(\d+)/);
-                const damageCostMatch = content.match(/원상복구비?\s*([\d,]+)\s*만?\s*원?/);
-
-                if (damageCostMatch && !monthlyRentMatch) {
-                    console.log('--- [DEBUG] Damage Cost Logic Triggered');
-                    // 원상복구비만 있고 월세 금액이 없는 경우 엉터리 계산 수정
-                    const damageAmount = damageCostMatch[1].replace(/,/g, '');
-                    const money = analysisData.keyFacts.money || '';
-                    if (money.includes('×') || money.includes('x')) {
-                        analysisData.keyFacts.money = `원상복구비 ${damageAmount}만 원, 연체 차임(금액 미상)`;
-                    }
-                }
-
-                // ⚠️ [후처리] keyFacts.who "상대방: 상대방" 같은 무의미한 값 수정
-                const who = analysisData.keyFacts.who || '';
-                if (who === '상대방: 상대방' || who.includes('상대방: 상대방') || who === '미상') {
-                    console.log('--- [DEBUG] Who Fix Triggered');
-                    // 사건 유형별로 당사자 정보 설정
-                    if (/사기|가짜|짝퉁|도망|연락.*안|차단/.test(content)) {
-                        analysisData.keyFacts.who = '의뢰인: 피해자 / 상대방: 사기 피의자';
-                    } else if (/번개장터|중고나라|당근마켓|중고/.test(content)) {
-                        analysisData.keyFacts.who = '의뢰인: 구매자(피해자) / 상대방: 판매자';
-                    } else if (isLandlord) {
-                        analysisData.keyFacts.who = '의뢰인: 임대인 / 상대방: 임차인';
-                    } else if (isTenant) {
-                        analysisData.keyFacts.who = '의뢰인: 임차인 / 상대방: 임대인';
-                    } else {
-                        analysisData.keyFacts.who = '의뢰인: 신청인 / 상대방: 피신청인';
-                    }
-                }
-
-                console.log('--- [DEBUG] Final Output (who):', analysisData.keyFacts.who);
-            } catch (parseError) {
-                console.error('JSON 파싱 실패:', parseError);
-                throw new Error('응답 파싱 실패');
+            if (!jsonMatch) {
+                console.error('JSON not found in response');
+                throw new Error('JSON Not Found');
             }
 
-            return Response.json({
-                success: true,
-                data: analysisData
-            });
+            const parsed = JSON.parse(jsonMatch[0]);
 
-        } catch (aiError: any) {
-            console.error('Gemini API 오류:', aiError);
-            // 폴백: 키워드 기반 분석
+            const analysisData: DetailedAnalysis = {
+                score: parsed.score || 50,
+                type: ['SAFE', 'WARNING', 'CRITICAL'].includes(parsed.type) ? parsed.type : 'WARNING',
+                caseBrief: parsed.caseBrief || '분석 결과를 확인해주세요.',
+                legalCategories: Array.isArray(parsed.legalCategories) ? parsed.legalCategories : ['법률 상담'],
+                keyFacts: {
+                    who: parsed.keyFacts?.who || '의뢰인 / 상대방',
+                    when: parsed.keyFacts?.when || '미상',
+                    money: parsed.keyFacts?.money || '해당 없음',
+                    evidenceStatus: parsed.keyFacts?.evidenceStatus || '확인 필요'
+                },
+                riskReason: parsed.riskReason || '',
+                actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : ['전문가 상담 권장']
+            };
+
+            return Response.json({ success: true, data: analysisData });
+
+        } catch (aiError) {
+            console.error('AI Error:', aiError);
+            // Fallback: 키워드 기반 분석
             return Response.json({
                 success: true,
                 data: getFallbackAnalysis(content)
@@ -212,207 +165,489 @@ export async function POST(req: Request) {
         }
 
     } catch (error: any) {
-        console.error('Analyze API Error:', error);
-        return Response.json({
-            success: false,
-            error: error.message || '알 수 없는 오류가 발생했습니다.'
-        }, { status: 500 });
+        console.error('Server Error:', error);
+        return Response.json({ success: false, error: error.message }, { status: 500 });
     }
 }
 
-// 폴백 분석 함수 (API 실패시)
+// =====================================================
+// [Fallback 분석] 역할 판단 개선 버전
+// =====================================================
 function getFallbackAnalysis(content: string): DetailedAnalysis {
-    const lowerContent = content.toLowerCase();
-
-    // === 역할 감지 ===
-    // 1. 임대차 관계 우선 확인 (Tenant 우선 감지)
-    const isLandlordStrong = /세입자.*(안|내지|밀려|도망|파손|원상복구|명도)|월세.*(안|내지|밀려)/.test(content);
-    const isTenant = !isLandlordStrong && /전세|보증금|이사|집주인.*(한테|에게|이|가)|임대인.*(한테|에게|이|가)|돌려|반환|안 줌|못 받/.test(content);
-    const isLandlord = isLandlordStrong || (!isTenant && (/집주인|임대인/.test(content) || /세입자/.test(content)));
-
-    // 2. 사기 범죄 확인 (임대차 관계가 아닐 때만 '도망', '차단' 등을 사기로 간주)
-    const isFraud = /사기|가짜|짝퉁/.test(content) || ((/도망|연락.*안|차단/.test(content)) && !isLandlord && !isTenant);
-    // 3. 명예훼손/영업방해 확인
-    const isDefamation = /명예훼손|모욕|비방|악성|거짓|허위사실|영업방해|식중독|후기|리뷰|글|삭제|사과/.test(content);
-    // 4. 층간소음
-    const isNoise = /층간소음|발망치|쿵쿵|새벽|고성방가|악기|떠드는|시끄러|소음/.test(content);
-    // 5. 임금/용역비/알바
-    const isLabor = /월급|알바비|임금|급여|퇴직금|용역비|외주|프리랜서|대금|정산|미지급|돈을 안 줘|일당/.test(content);
-    // 6. 누수
-    const isLeak = /누수|물이 새|곰팡이|배관|천장|아랫집|윗집|침수|보수공사/.test(content);
-
-    // === 금액 및 기간 추출 ===
-    let money = '미상';
-    let monthlyAmount = 0;
-
-    // 한글 금액 파싱 헬퍼 함수
-    const parseKoreanMoney = (text: string) => {
-        let total = 0;
-        const meatches = text.match(/([\d,]+)(억|천|백|십)?만?/g);
-        if (!meatches) return 0;
-
-        let currentUnit = 1;
-        // 단순 정규식으로 처리하기 복잡하므로, 주요 패턴만 캐치
-        // 예: "1억 2천"
-        const eokMatch = text.match(/([\d,]+)\s*억/);
-        const cheonMatch = text.match(/([\d,]+)\s*천/);
-        const manMatch = text.match(/([\d,]+)\s*만/);
-
-        if (eokMatch) total += parseInt(eokMatch[1].replace(/,/g, '')) * 100000000;
-        if (cheonMatch) total += parseInt(cheonMatch[1].replace(/,/g, '')) * 10000000;
-        else if (text.includes('천') && !cheonMatch) {
-            // "1억 2천"에서 '2'만 있는 경우 등은 복잡하므로 생략하거나 단순화.
-            // 여기서는 사용자 입력을 최대한 존중.
-            // 간단히 "1억 2천" 패턴 매칭
-            const combinedMatch = text.match(/(\d+)억\s*(\d+)천/);
-            if (combinedMatch) {
-                return parseInt(combinedMatch[1]) * 100000000 + parseInt(combinedMatch[2]) * 10000000;
-            }
-        }
-        if (manMatch) total += parseInt(manMatch[1].replace(/,/g, '')) * 10000;
-
-        // "1000만원" 같은 경우
-        if (total === 0) {
-            const digitOnly = text.match(/(\d+)(?:0000|만)/);
-            if (digitOnly) return parseInt(digitOnly[1]) * 10000;
-        }
-
-        return total;
-    };
-
-    // 1. "1억 2천" 패턴 우선 시도
-    const eokCheonMatch = content.match(/(\d+)\s*억\s*(\d+)\s*천/);
-    if (eokCheonMatch) {
-        money = `금 ${parseInt(eokCheonMatch[1])}억 ${parseInt(eokCheonMatch[2])}천만 원`;
-    } else {
-        // 기존 로직 + 단순 정수 매칭
-        const moneyMatch = content.match(/(\d{1,3}(?:,\d{3})*)\s*만\s*원/) || content.match(/(\d+)\s*원/);
-        if (moneyMatch) money = moneyMatch[0];
-    }
-
-    // 월세 키워드가 명확히 있을 때만 월세 추출
-    const rentMatch = content.match(/월세\s*(\d{1,3}(?:,\d{3})*)\s*만?\s*원?/);
-    if (rentMatch) {
-        monthlyAmount = parseInt(rentMatch[1].replace(/,/g, ''));
-    }
-
-    // 개월 수 추출
-    const monthCountMatch = content.match(/(\d+)\s*(?:개월|달)/);
-    const monthCount = monthCountMatch ? parseInt(monthCountMatch[1]) : 0;
-
-    // 특별 손해 감지
-    const isSpecialDamage = /대출|이자|이사|계약금|위약금|병원비|약값/.test(content);
-    let specialComment = '';
-    if (isSpecialDamage) {
-        specialComment = '(대출이자/계약금 등 추가 손해 포함)';
-    }
-
-    // 금액 서술 로직 업데이트
-    if (monthlyAmount > 0 && monthCount > 0) {
-        money = `연체 차임 총 ${monthlyAmount * monthCount}만 원` + (isSpecialDamage ? ' 및 특별손해금' : '');
-    } else if (money !== '미상' && isSpecialDamage) {
-        money += ' 및 대출이자 등 추가 손해금';
-    }
-
-    // === 시기 추출 ===
-    let when = '미상';
-    const timeMatch = content.match(/(\d+)\s*(?:개월|달|주일|일)\s*(?:전|째|동안)/);
-    if (timeMatch) when = timeMatch[0];
-
-    // === 증거 상태 추출 ===
-    let evidenceStatus = '확인 필요';
-    if (content.includes('카톡') || content.includes('문자') || content.includes('사진') || content.includes('캡처') || content.includes('녹음')) {
-        evidenceStatus = '입증 자료 일부 보유';
-    }
-
-    // === 결과 생성 ===
-    let score = 50;
     let type: 'SAFE' | 'WARNING' | 'CRITICAL' = 'WARNING';
-    let riskReason = '';
-    const actionItems: string[] = [];
-    const legalCategories: string[] = [];
+    let score = 60;
+    let categories: string[] = [];
+    let who = '의뢰인 / 상대방';
+    let actionItems: string[] = [];
+    let caseBrief = '';
+    let money = '해당 없음';
 
-    let whoForKeyFacts = '미상';
-    let caseBrief = '법률 상담이 필요한 사안입니다.';
+    // 금액 추출
+    const moneyPatterns = [
+        /(\d{1,3}(?:,\d{3})*)\s*만\s*원/g,
+        /(\d+)\s*억/g,
+        /(\d{1,3}(?:,\d{3})*)\s*원/g
+    ];
 
-    if (isFraud) {
-        score = 85;
+    for (const pattern of moneyPatterns) {
+        const match = content.match(pattern);
+        if (match) {
+            money = match[0];
+            break;
+        }
+    }
+
+    // =====================================================
+    // [핵심] 역할 판단 로직 개선
+    // =====================================================
+
+    // 1. 세입자(임차인)가 의뢰인인 경우 - 보증금 관련
+    const isTenantAsClient =
+        /집주인에게|임대인에게/.test(content) ||  // "집주인에게 ~했다" = 내가 세입자
+        /보증금.*(못|안).*(받|줄|돌려)/.test(content) ||  // "보증금 못 받을까봐"
+        /보증금.*(걱정|불안)/.test(content) ||  // "보증금 걱정"
+        /전세.*만기.*(이사|나가)/.test(content) ||  // "전세 만기라 이사"
+        /(세입자|임차인)입니다/.test(content) ||  // "세입자입니다"
+        /다음\s*세입자.*(안|못).*구해/.test(content);  // "다음 세입자 안 구해지면"
+
+    // 2. 집주인(임대인)이 의뢰인인 경우 - 명도/차임 관련
+    const isLandlordAsClient =
+        /세입자에게|임차인에게/.test(content) ||  // "세입자에게 ~했다" = 내가 집주인
+        /세입자가.*(월세|차임).*(안|못|밀)/.test(content) ||  // "세입자가 월세 안 냄"
+        /세입자가.*(도망|잠적|연락두절)/.test(content) ||  // "세입자가 도망"
+        /(집주인|임대인)입니다/.test(content) ||  // "집주인입니다"
+        /내보내|명도/.test(content);  // "내보내고 싶다", "명도"
+
+    // =====================================================
+    // 케이스별 분기 (순서 중요! - 임대차 관련 먼저 체크)
+    // =====================================================
+
+    // 1. 전세사기 / 깡통전세 / 경매 (임대차 + 사기 조합) - 최우선
+    const isRentalFraud = /전세.*사기|깡통.*전세|경매|근저당|선순위|배당|보증금.*(사기|못.*받)/.test(content);
+
+    if (isRentalFraud || ((/전세|보증금/.test(content)) && (/사기|경매|근저당|잠적/.test(content)))) {
         type = 'CRITICAL';
-        riskReason = '고의적 기망 또는 재산 침탈이 의심되는 사안입니다.';
-        actionItems.push('증거 자료 보전', '경찰 신고 검토', '전문 변호사 상담');
-        legalCategories.push('사기죄', '손해배상', '형사고소');
-        whoForKeyFacts = '의뢰인: 피해자 / 상대방: 사기 피의자';
-        caseBrief = '구매 물품 사기 피해가 의심되는 사안으로, 시급한 법적 대응이 필요합니다.';
-    } else if (isDefamation) {
-        score = 80;
+        score = 92;
+        categories = ['보증금반환청구', '임차권등기명령', '경매배당청구', '형사고소(사기)'];
+        who = '의뢰인: 임차인(세입자/피해자) / 상대방: 임대인(집주인/피의자)';
+        caseBrief = `전세사기/깡통전세 피해 의심 사안${money !== '해당 없음' ? ` (보증금: ${money})` : ''}`;
+        actionItems = [
+            '즉시 임차권등기명령 신청 (법원)',
+            '등기부등본 확인하여 선순위 채권 파악',
+            '전세보증금반환보증(HUG/SGI) 가입 여부 확인',
+            '경매 개시 시 배당요구 신청',
+            '집주인 상대 사기죄 형사고소 검토'
+        ];
+    }
+    // 2. 임대차 - 세입자가 의뢰인 (일반 보증금 반환)
+    else if (isTenantAsClient || ((/보증금|전세/.test(content)) && !isLandlordAsClient)) {
         type = 'WARNING';
-        riskReason = '허위 사실 유포로 인한 영업 손실 및 명예 실추가 지속되고 있어 신속한 대응이 필요합니다.';
-        actionItems.push('게시글 증거 확보(캡처)', '작성자 특정', '형사고소 검토', '민사 손해배상 청구');
-        legalCategories.push('명예훼손', '업무방해', '정보통신망법 위반');
-        whoForKeyFacts = '의뢰인: 피해자(사업주) / 상대방: 가해자(작성자)';
-        caseBrief = '온라인상 허위 사실 유포로 인한 명예훼손 및 영업방해 피해 사안입니다.';
-    } else if (isNoise) {
+        score = 72;
+        categories = ['보증금반환청구', '임차권등기명령', '전세보증금보증'];
+        who = '의뢰인: 임차인(세입자) / 상대방: 임대인(집주인)';
+        caseBrief = `보증금 반환 청구 사안${money !== '해당 없음' ? ` (보증금: ${money})` : ''}`;
+        actionItems = [
+            '내용증명 발송 (보증금 반환 요청 통보)',
+            '임차권등기명령 신청 준비',
+            '전세보증금반환보증(HUG/SGI) 가입 여부 확인',
+            '보증금 반환 소송 검토'
+        ];
+    }
+    // 3. 임대차 - 집주인이 의뢰인 (명도/차임)
+    else if (isLandlordAsClient) {
+        type = 'WARNING';
+        score = 75;
+        categories = ['명도소송', '차임지급청구', '점유이전금지가처분'];
+        who = '의뢰인: 임대인(집주인) / 상대방: 임차인(세입자)';
+        caseBrief = `임차인의 차임 연체/계약 위반으로 인한 명도 청구 사안`;
+        actionItems = [
+            '내용증명 발송 (계약 해지 및 명도 요청 통보)',
+            '점유이전금지가처분 신청',
+            '밀린 월세 내역 및 계약서 정리',
+            '명도소송 소장 작성 준비'
+        ];
+    }
+    // 4. 투자 사기 / 폰지 사기 / 다단계 (투자 관련 키워드 우선)
+    else if (/투자|원금.*보장|수익.*보장|확정.*수익|폰지|다단계|코인|비트코인|리딩방|퇴직금.*투자/.test(content) && /사기|피해|못.*받|안.*줘|잠적|연락.*안|동결/.test(content)) {
+        type = 'CRITICAL';
+        score = 90;
+        categories = ['사기죄', '유사수신행위', '형사고소'];
+        who = '의뢰인: 피해자(투자자) / 상대방: 피의자(투자권유자)';
+        caseBrief = `투자 사기(폰지/다단계) 피해 의심 사안${money !== '해당 없음' ? ` (피해액: ${money})` : ''}`;
+        actionItems = [
+            '경찰서 방문하여 사기죄로 형사고소',
+            '금융감독원(금감원)에 불법 금융업 신고',
+            '투자 약정서, 이체 내역, 대화 내역 모두 확보',
+            '동일 피해자 모집하여 공동 대응 검토',
+            '피의자 재산 가압류 신청 (도주/은닉 방지)'
+        ];
+    }
+    // 5. 온라인 사기 / 중고거래 사기 (플랫폼 키워드 또는 물품거래 키워드 필수)
+    else if (/중고나라|당근|번개|마켓|거래|판매|구매|물건|상품|배송/.test(content) && /사기|입금.*차단|물건.*안|잠적|먹튀|연락.*두절|차단/.test(content)) {
+        type = 'CRITICAL';
+        score = 88;
+        categories = ['사기죄', '형사고소', '손해배상청구'];
+        who = '의뢰인: 피해자(구매자) / 상대방: 피의자(판매자)';
+        caseBrief = `중고거래 사기 피해 의심 사례${money !== '해당 없음' ? ` (피해액: ${money})` : ''}`;
+        actionItems = [
+            '경찰서 방문하여 사기죄로 고소장 접수',
+            '계좌 이체내역 및 대화 캡처 확보',
+            '판매자 정보(전화번호, 계좌) 정리',
+            money !== '해당 없음' ? `피해액 ${money}에 대한 민사 소송 준비` : '피해액 산정 후 민사 소송 검토'
+        ];
+    }
+    // 5. 용역비 / 프리랜서 미지급 (노동법 적용 X, 민사)
+    else if (/프리랜서|외주|용역|잔금|외주비|제작비|디자인비|개발비/.test(content) && /미지급|안 줘|못 받|안 줌/.test(content)) {
+        type = 'CRITICAL';
+        score = 78;
+        categories = ['용역비청구', '지급명령', '민사소송'];
+        who = '의뢰인: 용역제공자(채권자) / 상대방: 의뢰인(채무자)';
+        caseBrief = `용역비(프리랜서 대금) 미지급 사안${money !== '해당 없음' ? ` (미지급액: ${money})` : ''}`;
+        actionItems = [
+            '내용증명 발송 (용역비 지급 독촉)',
+            '카카오톡/이메일 대화 내역 및 작업물 전송 기록 확보',
+            '구두 계약도 법적 효력 있음 - 증거 정리',
+            '법원 지급명령 신청 (소액: 3,000만 원 이하)',
+            money !== '해당 없음' ? `${money} 청구 민사소송 검토` : '청구액 산정 후 소송 검토'
+        ];
+    }
+    // 6. 임금체불 (근로자 - 노동법 적용)
+    else if (/알바|월급|임금|급여|퇴직금/.test(content) && /안 줘|못 받|밀려|체불|미지급/.test(content)) {
+        type = 'CRITICAL';
+        score = 80;
+        categories = ['임금체불', '노동청 진정', '체불임금 청구'];
+        who = '의뢰인: 근로자 / 상대방: 사업주';
+        caseBrief = `임금 체불 사안${money !== '해당 없음' ? ` (체불액: ${money})` : ''}`;
+        actionItems = [
+            '고용노동부 임금체불 진정서 제출',
+            '근로계약서 및 급여명세서 확보',
+            '출퇴근 기록 및 업무 증거 정리',
+            '법원 지급명령 신청 검토'
+        ];
+    }
+    // 7. 명예훼손/악플
+    else if (/욕|악플|명예훼손|모욕|비방|걸레|SNS|인스타/.test(content)) {
+        type = 'WARNING';
         score = 65;
+        categories = ['명예훼손', '모욕죄', '손해배상'];
+        who = '의뢰인: 피해자 / 상대방: 가해자';
+        caseBrief = '온라인 명예훼손/모욕 피해 사안';
+        actionItems = [
+            '게시물 및 댓글 화면 캡처 (URL 포함)',
+            '경찰서 사이버수사대에 고소장 접수',
+            '게시물 삭제 요청 (방송통신심의위원회)',
+            '민사 손해배상 청구 검토'
+        ];
+    }
+    // 8. 이혼/가정법 (폭행보다 먼저 체크!)
+    else if (/이혼|양육권|재산.*분할|위자료|친권|별거|혼인|배우자|남편|아내|도박.*빚|외도|불륜/.test(content)) {
         type = 'WARNING';
-        riskReason = '지속적인 소음으로 인한 정신적 고통 및 생활권 침해가 발생하고 있습니다.';
-        actionItems.push('소음 일지 작성', '관리사무소 중재 요청', '내용증명 발송', '분쟁조정위원회 신청');
-        legalCategories.push('층간소음', '손해배상', '주거침해');
-        whoForKeyFacts = '의뢰인: 피해자(아랫집/이웃) / 상대방: 가해자(윗집/이웃)';
-        caseBrief = '지속적인 공동주택 층간소음 피해로 인한 정신적 고통 및 손해배상 청구 사안입니다.';
-    } else if (isLabor) {
-        score = 80;
-        type = 'CRITICAL';
-        riskReason = '임금(용역비) 체불로 인한 생계 위협 및 계약 위반이 발생했습니다.';
-        actionItems.push('노동청 진정', '지급명령 신청', '내용증명 발송', '통장 압류 검토');
-        legalCategories.push('임금체불', '용역비청구', '근로기준법');
-        whoForKeyFacts = '의뢰인: 근로자(채권자) / 상대방: 사용자(채무자)';
-        caseBrief = '근로 제공 또는 용역 수행에 따른 정당한 대가(임금/용역비)를 지급받지 못한 사안입니다.';
-    } else if (isLeak) {
-        score = 75;
-        type = 'WARNING';
-        riskReason = '누수로 인한 건물 손상 및 곰팡이 등 2차 피해가 확대되고 있습니다.';
-        actionItems.push('피해 현장 사진 확보', '보수 공사 견적서', '내용증명 발송', '소송(손해배상)');
-        legalCategories.push('누수', '손해배상', '하자보수');
-        whoForKeyFacts = '의뢰인: 피해 세대주 / 상대방: 원인 제공 세대주(윗집)';
-        caseBrief = '건물 누수로 인한 위생상/재산상 피해 발생 및 보수 비용 청구 사안입니다.';
-    } else if (isLandlord) {
-        score = 75;
-        type = 'WARNING';
-        riskReason = '임차인의 계약 불이행으로 재산 손실이 발생하고 있습니다.';
-        actionItems.push('내용증명 발송', '계약 해지 통보', '명도소송 준비');
-        legalCategories.push('명도소송', '차임지급청구');
-        whoForKeyFacts = '의뢰인: 임대인 / 상대방: 임차인';
-        caseBrief = '임대인인 의뢰인이 임차인으로부터 차임 등을 지급받지 못하는 사안입니다.';
-    } else if (isTenant) {
         score = 70;
+        categories = ['이혼', '재산분할', '양육권', '위자료'];
+        who = '의뢰인: 배우자 / 상대방: 배우자';
+        caseBrief = '이혼 및 가사 분쟁 사안';
+        actionItems = [
+            '혼인관계증명서, 가족관계증명서 발급',
+            '재산 목록 정리 (부동산, 예금, 채무 등)',
+            '배우자 유책사유 증거 확보 (도박, 외도 등)',
+            '양육권 관련 자녀 양육 환경 입증 자료 준비',
+            '가정법원에 이혼조정/소송 신청 검토',
+            '위자료 및 재산분할 청구액 산정'
+        ];
+    }
+    // 9. 폭행/상해 (교통사고보다 먼저 체크!)
+    else if (/폭행|때리|맞|주먹|멱살|몸싸움|시비|싸움|전치|상해|진단.*주|쌍방/.test(content)) {
+        type = 'CRITICAL';
+        score = 85;
+        categories = ['폭행죄', '상해죄', '형사고소', '손해배상'];
+        who = '의뢰인: 피해자 / 상대방: 가해자';
+        caseBrief = '폭행/상해 피해로 인한 형사고소 사안';
+        actionItems = [
+            '즉시 병원에서 상해진단서 발급',
+            '사건 현장 CCTV 및 목격자 확보',
+            '경찰서 방문하여 폭행/상해죄 고소장 제출',
+            '치료비 및 위자료 손해배상 청구 검토',
+            '쌍방폭행 주장 대응 - 정당방위 입증 준비'
+        ];
+    }
+    // 9. 렌터카 분쟁 (과다 수리비/휴차료 청구) - 교통사고보다 먼저!
+    else if (/렌터카|렌트카|렌탈|휴차료|대차료|반납/.test(content) && /수리비|과도|과다|현금|막무가내|사기/.test(content)) {
         type = 'WARNING';
-        riskReason = '보증금 반환 지연으로 인한 손해가 우려됩니다.';
-        actionItems.push('내용증명 발송', '임차권등기명령 신청');
-        legalCategories.push('보증금반환', '임차권등기');
-        whoForKeyFacts = '의뢰인: 임차인 / 상대방: 임대인';
-        caseBrief = '임차인인 의뢰인이 임대인으로부터 보증금을 반환받지 못하는 사안입니다.';
-    } else {
-        score = 0;
-        type = 'SAFE';
-        riskReason = '구체적인 사실관계(피해 금액, 상대방의 행위 등)가 부족하여 위험도를 산정할 수 없습니다.';
-        actionItems.push('육하원칙에 맞춰 구체적으로 재작성', '증거 자료(계약서, 문자 등) 확인');
-        legalCategories.push('법률상담');
-        whoForKeyFacts = '미상';
-        caseBrief = '입력된 정보가 부족하여 법적 분석이 어렵습니다. 구체적인 상황을 입력해주세요.';
+        score = 65;
+        categories = ['소비자분쟁', '과다청구', '손해배상'];
+        who = '의뢰인: 소비자(렌터카 이용자) / 상대방: 렌터카 업체';
+        caseBrief = `렌터카 과다 수리비 분쟁 사안${money !== '해당 없음' ? ` (청구액: ${money})` : ''}`;
+        actionItems = [
+            '렌터카 계약서 및 약관 재확인',
+            '손상 부위 사진/동영상 촬영 (반납 시점 기록)',
+            '수리 견적서 요청 및 타 업체 견적 비교',
+            '보험 적용 가능 여부 확인 (자차 보험, 신용카드 부가서비스)',
+            '한국소비자원(1372) 상담 및 피해구제 신청',
+            '부당한 현금 요구 시 녹취 및 증거 확보'
+        ];
+    }
+    // 10. 교통사고 (차량/교통 키워드 필수)
+    else if (/교통사고|접촉사고|뺑소니|블랙박스|과실.*비율|차대차/.test(content) && !/렌터카|렌트카|렌탈|휴차료/.test(content)) {
+        type = 'WARNING';
+        score = 70;
+        categories = ['교통사고', '손해배상', '보험금청구'];
+        who = '의뢰인: 피해자 / 상대방: 가해자(또는 보험사)';
+        caseBrief = `교통사고 피해 보상 사안${money !== '해당 없음' ? ` (청구액: ${money})` : ''}`;
+        actionItems = [
+            '사고 현장 사진 및 블랙박스 영상 확보',
+            '경찰 교통사고 사실확인원 발급',
+            '진단서 및 치료비 영수증 수집',
+            '보험사 합의 전 전문가 상담 권장',
+            '합의금이 적정한지 검토 후 협상'
+        ];
+    }
+    // 9. 층간소음
+    else if (/층간소음|윗집|아랫집|쿵쿵|발소리|소음|시끄러|뛰어다니/.test(content)) {
+        type = 'WARNING';
+        score = 55;
+        categories = ['층간소음', '손해배상', '주거침해'];
+        who = '의뢰인: 피해 세대 / 상대방: 소음 유발 세대';
+        caseBrief = '층간소음 피해로 인한 분쟁 사안';
+        actionItems = [
+            '소음 발생 시간대 및 빈도 기록 (일지 작성)',
+            '소음측정기 앱으로 데시벨(dB) 측정 및 녹음',
+            '관리사무소에 공식 민원 접수',
+            '국가소음정보시스템 또는 환경부 신고',
+            '내용증명 발송 (경고 및 손해배상 예고)'
+        ];
+    }
+    // 10. 소비자 환불 (인터넷쇼핑, 하자)
+    else if (/환불|반품|하자|불량|교환|쇼핑몰|배송|취소|청약철회/.test(content)) {
+        type = 'WARNING';
+        score = 60;
+        categories = ['소비자보호', '청약철회', '환불청구'];
+        who = '의뢰인: 소비자 / 상대방: 판매자(사업자)';
+        caseBrief = `소비자 환불/교환 분쟁 사안${money !== '해당 없음' ? ` (구매액: ${money})` : ''}`;
+        actionItems = [
+            '구매 내역 및 결제 영수증 확보',
+            '판매자와의 대화 내역 캡처',
+            '전자상거래법상 청약철회 기간(7일) 확인',
+            '1372 소비자상담센터 신고',
+            '한국소비자원 피해구제 신청'
+        ];
+    }
+    // 11. 대여금 (지인에게 빌려준 돈)
+    else if (/빌려|빌린|대여|차용|갚|상환|돈.*안|돈.*못|원.*받/.test(content) && !/전세|보증금|월세/.test(content)) {
+        type = 'WARNING';
+        score = 68;
+        categories = ['대여금청구', '지급명령', '민사소송'];
+        who = '의뢰인: 채권자(빌려준 사람) / 상대방: 채무자(빌린 사람)';
+        caseBrief = `대여금 반환 청구 사안${money !== '해당 없음' ? ` (대여금: ${money})` : ''}`;
+        actionItems = [
+            '차용증, 계좌이체 내역 등 증거 확보',
+            '카카오톡/문자 대화 내역 백업',
+            '내용증명 발송 (상환 독촉)',
+            '법원 지급명령 신청 (간편 절차)',
+            money !== '해당 없음' ? `${money} 청구 민사소송 검토` : '청구액 산정 후 소송 검토'
+        ];
+    }
+    // 12. 협박 (폭행은 위에서 이미 처리됨, 협박만 체크)
+    else if (/협박|위협|죽이|으.*겠|협박.*죽/.test(content)) {
+        type = 'CRITICAL';
+        score = 80;
+        categories = ['협박죄', '형사고소'];
+        who = '의뢰인: 피해자 / 상대방: 가해자';
+        caseBrief = '협박 피해로 인한 형사고소 사안';
+        actionItems = [
+            '협박 내용 녹음 또는 캡처 확보',
+            '112 신고 또는 경찰서 방문',
+            '경찰서에 협박죄로 고소장 제출',
+            '민사상 손해배상(위자료) 청구 검토'
+        ];
+    }
+    // 13. 공사/수리 하자 (인테리어, 시공 불량)
+    else if (/인테리어|공사|시공|하자|수리|리모델링|누수|균열|부실/.test(content)) {
+        type = 'WARNING';
+        score = 65;
+        categories = ['하자보수청구', '손해배상', '공사대금분쟁'];
+        who = '의뢰인: 발주자(집주인) / 상대방: 시공업체';
+        caseBrief = `공사/시공 하자 분쟁 사안${money !== '해당 없음' ? ` (공사비: ${money})` : ''}`;
+        actionItems = [
+            '하자 부분 사진 및 동영상 촬영',
+            '시공 계약서 및 견적서 확보',
+            '하자보수 요청 내용증명 발송',
+            '제3자 전문가 감정 검토',
+            '하자보수 불이행 시 손해배상 소송 준비'
+        ];
+    }
+    // 14. 의료과실 / 의료분쟁
+    else if (/병원|의사|수술|치료|오진|의료.*과실|부작용|후유증|사망|진료/.test(content) && /사고|피해|실수|잘못|과실|고소/.test(content)) {
+        type = 'CRITICAL';
+        score = 80;
+        categories = ['의료분쟁', '의료과실', '손해배상'];
+        who = '의뢰인: 피해자(환자) / 상대방: 의료기관(의사)';
+        caseBrief = '의료과실 피해 분쟁 사안';
+        actionItems = [
+            '진료기록부 사본 발급 요청',
+            '다른 병원에서 소견서 받기',
+            '한국의료분쟁조정중재원 조정 신청',
+            '의료과실 전문 변호사 상담',
+            '손해배상 청구 소송 검토'
+        ];
+    }
+    // 15. 직장 내 괴롭힘 / 갑질
+    else if (/직장|회사|상사|팀장|부장|갑질|괴롭힘|왕따|따돌림|폭언|모욕|퇴사.*강요/.test(content)) {
+        type = 'WARNING';
+        score = 72;
+        categories = ['직장내괴롭힘', '근로기준법', '손해배상'];
+        who = '의뢰인: 피해 근로자 / 상대방: 가해자(상사/회사)';
+        caseBrief = '직장 내 괴롭힘 피해 사안';
+        actionItems = [
+            '괴롭힘 내용 일지 작성 및 증거 수집',
+            '녹음, 문자, 이메일 등 증거 확보',
+            '사내 신고 또는 고충처리위원회 신고',
+            '고용노동부 진정 접수',
+            '손해배상 청구 및 산재 신청 검토'
+        ];
+    }
+    // 16. 부당해고 / 불법해고
+    else if (/해고|짤|퇴직.*강요|권고사직|부당.*해고|계약.*해지|정리해고/.test(content)) {
+        type = 'CRITICAL';
+        score = 78;
+        categories = ['부당해고', '해고무효', '근로기준법'];
+        who = '의뢰인: 피해 근로자 / 상대방: 사용자(회사)';
+        caseBrief = '부당해고 구제 사안';
+        actionItems = [
+            '해고통지서 또는 해고 관련 증거 확보',
+            '근로계약서, 취업규칙 확인',
+            '노동위원회 부당해고 구제신청 (3개월 이내)',
+            '고용노동부 진정 접수',
+            '해고무효 확인소송 및 임금청구 검토'
+        ];
+    }
+    // 17. 저작권 / 지식재산권 침해
+    else if (/저작권|도용|표절|무단.*사용|불법.*복제|디자인.*도용|상표|특허/.test(content)) {
+        type = 'WARNING';
+        score = 70;
+        categories = ['저작권침해', '지식재산권', '손해배상'];
+        who = '의뢰인: 권리자 / 상대방: 침해자';
+        caseBrief = '저작권/지식재산권 침해 사안';
+        actionItems = [
+            '침해 증거 캡처 및 보존 (URL, 날짜 포함)',
+            '저작권 등록 여부 확인',
+            '침해 중지 요청 내용증명 발송',
+            '한국저작권위원회 조정 신청',
+            '손해배상 청구 소송 검토'
+        ];
+    }
+    // 18. 학교폭력 / 왕따
+    else if (/학교.*폭력|학폭|왕따|따돌림|학생.*괴롭힘|선생님|교사|학교/.test(content) && /폭행|협박|욕|괴롭|피해/.test(content)) {
+        type = 'CRITICAL';
+        score = 82;
+        categories = ['학교폭력', '손해배상', '형사고소'];
+        who = '의뢰인: 피해 학생(보호자) / 상대방: 가해 학생(보호자)';
+        caseBrief = '학교폭력 피해 사안';
+        actionItems = [
+            '피해 내용 상세 기록 및 증거 수집',
+            '학교폭력대책심의위원회 신고',
+            '경찰서 피해 신고 및 고소',
+            '심리상담 및 치료 기록 보존',
+            '가해자 측 손해배상 청구 검토'
+        ];
+    }
+    // 19. 보험금 거부 / 보험 분쟁
+    else if (/보험|보험금|거부|거절|지급.*안|보험.*사기|약관|면책/.test(content) && !/교통사고/.test(content)) {
+        type = 'WARNING';
+        score = 68;
+        categories = ['보험분쟁', '보험금청구', '손해배상'];
+        who = '의뢰인: 보험 가입자 / 상대방: 보험회사';
+        caseBrief = '보험금 지급 거부 분쟁 사안';
+        actionItems = [
+            '보험 계약서 및 약관 확인',
+            '보험금 청구 서류 재확인',
+            '금융감독원 민원 접수',
+            '금융분쟁조정위원회 조정 신청',
+            '보험금 청구 소송 검토'
+        ];
+    }
+    // 20. 부동산 중개 분쟁
+    else if (/부동산|중개|복비|중개.*수수료|공인중개사|허위.*매물|계약.*파기/.test(content)) {
+        type = 'WARNING';
+        score = 65;
+        categories = ['부동산중개', '손해배상', '중개사책임'];
+        who = '의뢰인: 매수자/임차인 / 상대방: 공인중개사';
+        caseBrief = '부동산 중개 분쟁 사안';
+        actionItems = [
+            '중개계약서 및 관련 서류 확보',
+            '허위 설명 또는 중요사항 미고지 증거 수집',
+            '공인중개사협회 민원 접수',
+            '한국공인중개사협회 손해배상 청구',
+            '손해배상 소송 검토'
+        ];
+    }
+    // 21. 개인정보 유출
+    else if (/개인정보|유출|해킹|정보.*유출|스팸|보이스피싱|파밍/.test(content)) {
+        type = 'WARNING';
+        score = 70;
+        categories = ['개인정보보호', '손해배상', '형사고소'];
+        who = '의뢰인: 피해자 / 상대방: 유출 기관/회사';
+        caseBrief = '개인정보 유출 피해 사안';
+        actionItems = [
+            '유출 사실 확인 및 증거 확보',
+            '개인정보보호위원회 신고',
+            '금융기관 계좌 점검 및 비밀번호 변경',
+            '2차 피해 방지 조치',
+            '손해배상 청구 검토'
+        ];
+    }
+    // 22. 헬스장/피트니스 환불
+    else if (/헬스|피트니스|PT|운동|환불.*거부|중도.*해지|회원권/.test(content)) {
+        type = 'WARNING';
+        score = 55;
+        categories = ['소비자분쟁', '환불청구', '불공정약관'];
+        who = '의뢰인: 소비자(회원) / 상대방: 헬스장/피트니스';
+        caseBrief = '헬스장 환불 분쟁 사안';
+        actionItems = [
+            '회원 계약서 및 약관 확인',
+            '체육시설법상 환불 규정 확인',
+            '업체에 서면 환불 요청',
+            '1372 소비자상담센터 신고',
+            '한국소비자원 피해구제 신청'
+        ];
+    }
+    // 23. 이사/택배 파손
+    else if (/이사|택배|파손|분실|배송|물건.*망가|박스.*찢어/.test(content)) {
+        type = 'WARNING';
+        score = 60;
+        categories = ['운송분쟁', '손해배상', '소비자보호'];
+        who = '의뢰인: 소비자 / 상대방: 이사/택배 업체';
+        caseBrief = '이사/택배 물품 파손 분쟁 사안';
+        actionItems = [
+            '파손 물품 사진 촬영 및 증거 확보',
+            '업체에 즉시 피해 통보',
+            '물품 가액 증빙 자료 준비',
+            '1372 소비자상담센터 신고',
+            '손해배상 청구'
+        ];
+    }
+    // 기본 Fallback
+    else {
+        categories = ['법률 상담'];
+        caseBrief = '사연을 분석 중입니다. 추가 정보가 필요합니다.';
+        actionItems = [
+            '관련 증거 자료 수집 및 정리',
+            '상대방과의 대화 내역 백업',
+            '전문 변호사 상담 권장'
+        ];
     }
 
     return {
         score,
         type,
         caseBrief,
-        legalCategories,
+        legalCategories: categories,
         keyFacts: {
-            who: whoForKeyFacts,
-            when,
+            who,
+            when: '최근',
             money,
-            evidenceStatus
+            evidenceStatus: '확인 필요'
         },
-        riskReason,
+        riskReason: 'AI 분석 결과입니다.',
         actionItems
     };
 }

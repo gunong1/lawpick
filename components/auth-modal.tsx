@@ -84,6 +84,8 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialView
                     const userName = email.split('@')[0];
                     localStorage.setItem('session_user', userName);
                     localStorage.setItem('user_email', email);
+                    // 커스텀 이벤트 발생 (스캐너에서 감지)
+                    window.dispatchEvent(new Event('lawpick_login'));
                     onLoginSuccess(userName);
                     onClose();
                 } else {
@@ -137,6 +139,8 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialView
                         // 로그인 성공 처리
                         localStorage.setItem('session_user', nickname);
                         localStorage.setItem('user_email', email); // 결제 연동을 위해 이메일 저장
+                        // 커스텀 이벤트 발생 (스캐너에서 감지)
+                        window.dispatchEvent(new Event('lawpick_login'));
 
                         setLoadingType('NONE');
                         onLoginSuccess(nickname);

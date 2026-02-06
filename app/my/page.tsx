@@ -1,78 +1,87 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CreditCard, User, FileText, ChevronRight, Shield, AlertTriangle, CheckCircle2, LogOut, LayoutDashboard } from 'lucide-react';
+import { CreditCard, CheckCircle2, AlertTriangle, ShieldCheck, ChevronRight, Settings, Home, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+
+declare global {
+    interface Window {
+        IMP: any;
+    }
+}
 
 export default function MyPage() {
-    const router = useRouter();
-    const [user, setUser] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    // 가상의 구독/결제 상태
+    const [userName, setUserName] = useState('고객');
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [hasCard, setHasCard] = useState(false);
-    const [isCardFormOpen, setIsCardFormOpen] = useState(false);
-
-    // 카드 입력 상태
-    const [cardNumber, setCardNumber] = useState({ p1: '', p2: '', p3: '', p4: '' });
 
     useEffect(() => {
-        const checkLogin = () => {
-            const savedUser = localStorage.getItem('session_user');
-            setTimeout(() => {
-                if (savedUser) {
-                    setUser({
-                        name: savedUser,
-                        email: 'user@lawpick.com',
-                        phone: '010-****-****',
-                        joinDate: '2026.02.06'
-                    });
-                } else {
-                    setUser({
-                        name: '게스트',
-                        email: 'guest@lawpick.com',
-                        phone: '010-0000-0000',
-                        joinDate: '2026.02.06'
-                    });
-                }
-                setLoading(false);
-            }, 500);
-        };
-        checkLogin();
+        // 1. 로그인 세션 확인
+        const savedUser = localStorage.getItem('session_user');
+        if (savedUser) setUserName(savedUser);
+
+        // 2. 구독 상태 확인
+        const subStatus = localStorage.getItem('lawpick_subscription');
+        if (subStatus === 'true') {
+            setIsSubscribed(true);
+            setHasCard(true);
+        }
+
+        // 3. 포트원 초기화 (대표님의 실제 코드를 적용했습니다!)
+        if (typeof window !== 'undefined' && window.IMP) {
+            // 이미지에서 확인한 '고객사 식별코드'를 넣었습니다.
+            window.IMP.init('imp02261832');
+        }
     }, []);
 
+    // 로그아웃 함수
     const handleLogout = () => {
         if (confirm('로그아웃 하시겠습니까?')) {
             localStorage.removeItem('session_user');
-            alert('로그아웃 되었습니다.');
-            router.push('/');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('lawpick_subscription');
+            window.location.href = '/';
         }
     };
 
-    const handleRegisterCard = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        if (!window.IMP) return;
+    // 구독 해지 함수
+    const handleCancelSubscription = () => {
+        if (confirm('정말 멤버십을 해지하시겠습니까?\n\n해지 시 다음 결제일부터 요금이 청구되지 않으며,\n프리미엄 기능 이용이 제한됩니다.')) {
+            // 구독 해지 처리
+            localStorage.removeItem('lawpick_subscription');
+            setIsSubscribed(false);
+            setHasCard(false);
+            alert('멤버십이 해지되었습니다.\n그동안 로픽을 이용해주셔서 감사합니다.');
+            // (실무에서는 서버에 해지 요청을 보내야 합니다)
+        }
+    };
 
-        // 로컬 스토리지에 저장된 카카오 정보 가져오기
+    // ★ 다날 정기결제 빌링키 발급 함수
+    const handleRegisterCard = () => {
+        if (!window.IMP) {
+            alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+
+        // 카카오 이메일이나 유저 ID를 가져옴
         const userEmail = localStorage.getItem('user_email') || `user_${new Date().getTime()}`;
-        const userName = localStorage.getItem('session_user') || '고객';
 
+        // 포트원 빌링키 발급 요청 (0원 결제)
         window.IMP.request_pay({
-            pg: 'html5_inicis',
+            pg: 'danal_tpay', // [확인됨] 다날 일반/정기결제 V1 코드
             pay_method: 'card',
-            merchant_uid: `card_reg_${new Date().getTime()}`,
+            merchant_uid: `billing_${new Date().getTime()}`, // 주문번호 (매번 달라야 함)
             name: '로픽 멤버십 정기결제 카드 등록',
-            amount: 0,
-            customer_uid: userEmail, // [중요] 카카오 이메일을 결제 ID로 사용
+            amount: 0, // 0원으로 인증만 진행 (실제 청구 X)
+            customer_uid: userEmail, // [중요] 나중에 이 ID로 4,900원 결제를 요청하게 됩니다.
             buyer_email: userEmail,
             buyer_name: userName,
+            buyer_tel: '010-0000-0000',
         }, (rsp: any) => {
             if (rsp.success) {
-                alert('카드가 성공적으로 등록되었습니다! (정기결제 준비 완료)');
+                alert('카드가 안전하게 등록되었습니다.\n이제 멤버십을 시작할 수 있습니다.');
                 setHasCard(true);
+                // (실무에서는 여기서 서버로 rsp.customer_uid를 보내 저장해야 합니다)
             } else {
                 alert(`카드 등록 실패: ${rsp.error_msg}`);
             }
@@ -82,169 +91,107 @@ export default function MyPage() {
     const handleSubscribe = () => {
         if (!hasCard) {
             alert('결제 수단을 먼저 등록해주세요.');
-            setIsCardFormOpen(true);
             return;
         }
-        if (confirm('월 4,900원 멤버십을 구독하시겠습니까?\n등록된 카드로 즉시 결제됩니다.')) {
+
+        if (confirm('월 4,900원 멤버십을 구독하시겠습니까?\n(테스트 모드: 실제 돈은 나가지 않습니다)')) {
             setIsSubscribed(true);
-            alert('환영합니다! 로픽 멤버십이 활성화되었습니다.');
+            // 구독 성공 도장 찍기
+            localStorage.setItem('lawpick_subscription', 'true');
+            alert('환영합니다! 로픽 멤버십이 활성화되었습니다.\n이제 진단 결과의 모든 잠금이 해제됩니다.');
+            // 메인으로 이동
+            window.location.href = '/';
         }
     };
 
-    if (loading) {
-        return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">로딩 중...</div>;
-    }
-
     return (
-        <div className="min-h-screen bg-slate-900 text-white">
-
-            {/* 헤더 - 밝은 배경으로 로고 가시성 확보 */}
-            <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 cursor-pointer">
-                        <Image src="/logo.png" alt="LawPick" width={120} height={32} className="h-8 w-auto" />
-                        <span className="text-xs font-medium text-slate-400 ml-1 bg-slate-100 px-2 py-0.5 rounded">MY</span>
+        <main className="min-h-screen bg-[#0f172a] text-white">
+            {/* 상단 네비게이션 바 */}
+            <nav className="fixed top-0 left-0 right-0 bg-[#0f172a]/95 backdrop-blur-sm border-b border-slate-700 z-50">
+                <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+                    {/* 로고 (홈으로 이동) */}
+                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center">
+                            <span className="text-white font-black text-sm">L</span>
+                        </div>
+                        <span className="font-bold text-lg">Lawpick</span>
                     </Link>
-                    <button onClick={handleLogout} className="text-sm text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium">
-                        <LogOut className="w-4 h-4" /> 로그아웃
-                    </button>
-                </div>
-            </header>
 
-            <main className="container mx-auto px-4 py-10 max-w-5xl">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-                    {/* 왼쪽: 프로필 및 메뉴 */}
-                    <div className="md:col-span-1 space-y-6">
-                        {/* 프로필 카드 */}
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 text-center">
-                            <div className="w-20 h-20 bg-slate-700 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl">
-                                🐶
-                            </div>
-                            <h2 className="text-xl font-bold mb-1">{user?.name}님</h2>
-                            <p className="text-sm text-slate-400 mb-4">{user?.email}</p>
-                            <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${isSubscribed ? 'bg-blue-500/20 text-blue-400 border-blue-500/50' : 'bg-slate-700 text-slate-400 border-slate-600'}`}>
-                                {isSubscribed ? 'PREMIUM 멤버십' : 'FREE 회원'}
-                            </div>
-                        </div>
-
-                        {/* 메뉴 리스트 */}
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden">
-                            <div className="p-4 hover:bg-slate-700/50 cursor-pointer border-b border-slate-700 flex items-center justify-between transition-colors">
-                                <div className="flex items-center gap-3 text-sm font-medium"><User className="w-4 h-4 text-slate-400" /> 내 정보 수정</div>
-                                <ChevronRight className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <div className="p-4 hover:bg-slate-700/50 cursor-pointer border-b border-slate-700 flex items-center justify-between transition-colors">
-                                <div className="flex items-center gap-3 text-sm font-medium"><Shield className="w-4 h-4 text-slate-400" /> 보안 설정</div>
-                                <ChevronRight className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <div className="p-4 hover:bg-slate-700/50 cursor-pointer flex items-center justify-between transition-colors">
-                                <div className="flex items-center gap-3 text-sm font-medium text-red-400"><AlertTriangle className="w-4 h-4" /> 회원 탈퇴</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 오른쪽: 대시보드 메인 */}
-                    <div className="md:col-span-2 space-y-6">
-
-                        {/* 1. 구독/결제 관리 섹션 */}
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-6 relative overflow-hidden">
-                            {isSubscribed && <div className="absolute top-0 right-0 p-3 bg-blue-600 text-xs font-bold rounded-bl-xl text-white">구독 중</div>}
-
-                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <CreditCard className="w-5 h-5 text-blue-500" /> 구독 및 결제 관리
-                            </h3>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* 구독 상태 */}
-                                <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
-                                    <div className="text-sm text-slate-400 mb-1">현재 이용 중인 플랜</div>
-                                    <div className="text-xl font-bold text-white mb-2">{isSubscribed ? '로픽 멤버십 (월 4,900원)' : '무료 체험판'}</div>
-                                    {!isSubscribed ? (
-                                        <button onClick={handleSubscribe} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-colors">
-                                            멤버십 시작하기
-                                        </button>
-                                    ) : (
-                                        <div className="text-xs text-slate-500">다음 결제일: 2026.03.06</div>
-                                    )}
-                                </div>
-
-                                {/* 결제 수단 */}
-                                <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800">
-                                    <div className="text-sm text-slate-400 mb-1">등록된 결제 수단</div>
-                                    {hasCard ? (
-                                        <div className="flex items-center justify-between h-full pb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-5 bg-slate-200 rounded"></div>
-                                                <span className="text-sm font-bold">**** 1234</span>
-                                            </div>
-                                            <button onClick={() => { setHasCard(false); setIsSubscribed(false); alert('카드가 삭제되었습니다.'); }} className="text-xs text-red-400 underline">삭제</button>
-                                        </div>
-                                    ) : (
-                                        isCardFormOpen ? (
-                                            <form onSubmit={handleRegisterCard} className="space-y-2">
-                                                <div className="flex gap-1">
-                                                    <input type="text" maxLength={4} className="w-full bg-slate-800 border border-slate-700 rounded px-1 py-1 text-center text-sm" placeholder="0000" onChange={(e) => setCardNumber({ ...cardNumber, p1: e.target.value })} />
-                                                    <input type="password" maxLength={4} className="w-full bg-slate-800 border border-slate-700 rounded px-1 py-1 text-center text-sm" placeholder="****" />
-                                                    <input type="password" maxLength={4} className="w-full bg-slate-800 border border-slate-700 rounded px-1 py-1 text-center text-sm" placeholder="****" />
-                                                    <input type="text" maxLength={4} className="w-full bg-slate-800 border border-slate-700 rounded px-1 py-1 text-center text-sm" placeholder="0000" onChange={(e) => setCardNumber({ ...cardNumber, p4: e.target.value })} />
-                                                </div>
-                                                <button type="submit" className="w-full py-1.5 bg-slate-700 hover:bg-slate-600 text-xs font-bold rounded">등록 완료</button>
-                                            </form>
-                                        ) : (
-                                            <button onClick={() => setIsCardFormOpen(true)} className="w-full h-10 border border-dashed border-slate-600 rounded-lg text-slate-500 text-sm hover:text-white hover:border-slate-400 transition-colors flex items-center justify-center">
-                                                + 카드 등록하기
-                                            </button>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. 최근 진단 내역 */}
-                        <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-6">
-                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-green-500" /> 최근 법률 리스크 진단 내역
-                            </h3>
-
-                            <div className="space-y-3">
-                                {/* 샘플 데이터 1 */}
-                                <div className="bg-slate-800 rounded-xl p-4 flex items-center justify-between hover:bg-slate-700/80 transition-colors cursor-pointer group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center">
-                                            <AlertTriangle className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-slate-200 group-hover:text-white">전세 계약 특약 검토</div>
-                                            <div className="text-xs text-slate-500">2026.02.05 · 위험도 높음 (85점)</div>
-                                        </div>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-300" />
-                                </div>
-
-                                {/* 샘플 데이터 2 */}
-                                <div className="bg-slate-800 rounded-xl p-4 flex items-center justify-between hover:bg-slate-700/80 transition-colors cursor-pointer group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center">
-                                            <CheckCircle2 className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-slate-200 group-hover:text-white">차용증 법적 효력 분석</div>
-                                            <div className="text-xs text-slate-500">2026.01.20 · 안전함 (15점)</div>
-                                        </div>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-300" />
-                                </div>
-                            </div>
-
-                            <button className="w-full mt-4 py-3 text-sm text-slate-500 font-bold hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
-                                진단 기록 전체보기
-                            </button>
-                        </div>
-
+                    {/* 오른쪽 버튼들 */}
+                    <div className="flex items-center gap-3">
+                        <Link href="/" className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-sm">
+                            <Home className="w-4 h-4" />
+                            <span className="hidden sm:inline">홈</span>
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-1 text-slate-400 hover:text-red-400 transition-colors text-sm"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            <span className="hidden sm:inline">로그아웃</span>
+                        </button>
                     </div>
                 </div>
-            </main>
-        </div>
+            </nav>
+
+            {/* 메인 콘텐츠 (상단바 높이만큼 패딩) */}
+            <div className="max-w-2xl mx-auto p-4 pt-20 pb-20">
+                <h1 className="text-3xl font-black mb-2">MY 로픽</h1>
+                <p className="text-slate-400 mb-8">내 법률 안전 등급과 구독 관리</p>
+
+                {/* 대시보드 카드 */}
+                <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl mb-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center text-xl font-bold">
+                                {userName.slice(0, 1)}
+                            </div>
+                            <div>
+                                <div className="font-bold text-lg">{userName}님</div>
+                                <div className="text-sm text-slate-400">{isSubscribed ? '프리미엄 멤버십 이용 중' : '무료 회원'}</div>
+                            </div>
+                        </div>
+                        {isSubscribed && <span className="bg-blue-600 text-xs px-2 py-1 rounded font-bold">ACTIVE</span>}
+                    </div>
+
+                    {/* 구독 상태에 따른 UI 분기 */}
+                    {!isSubscribed ? (
+                        <div className="bg-slate-900/50 rounded-xl p-5 border border-slate-700/50">
+                            <h3 className="font-bold mb-2 flex items-center"><AlertTriangle className="w-4 h-4 text-yellow-500 mr-2" />구독이 필요합니다</h3>
+                            <p className="text-sm text-slate-400 mb-4">카드 등록하고 첫 달 무료 혜택을 받아보세요.</p>
+
+                            {!hasCard ? (
+                                <button onClick={handleRegisterCard} className="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-lg font-bold flex items-center justify-center transition-colors">
+                                    <CreditCard className="w-4 h-4 mr-2" /> 결제 수단 등록하기
+                                </button>
+                            ) : (
+                                <button onClick={handleSubscribe} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold flex items-center justify-center transition-colors animate-pulse">
+                                    <CheckCircle2 className="w-4 h-4 mr-2" /> 멤버십 시작하기 (월 4,900원)
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="bg-blue-900/20 rounded-xl p-5 border border-blue-500/30">
+                            <h3 className="font-bold mb-2 text-blue-400 flex items-center"><ShieldCheck className="w-4 h-4 mr-2" />안전하게 보호받고 있습니다</h3>
+                            <p className="text-sm text-slate-400 mb-4">다음 결제일: 2026. 03. 06 (4,900원)</p>
+                            <button onClick={handleCancelSubscription} className="w-full bg-slate-800 hover:bg-slate-700 py-3 rounded-lg font-bold text-sm text-slate-400 transition-colors">결제 수단 관리 / 해지</button>
+                        </div>
+                    )}
+                </div>
+
+                {/* 하단 메뉴 리스트 */}
+                <div className="space-y-3">
+                    <div className="bg-slate-800 p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-slate-700 transition-colors">
+                        <span className="font-bold text-slate-300">내 진단 리포트 보관함</span> <ChevronRight className="w-5 h-5 text-slate-500" />
+                    </div>
+                    <div className="bg-slate-800 p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-slate-700 transition-colors">
+                        <span className="font-bold text-slate-300">작성한 내용증명 관리</span> <ChevronRight className="w-5 h-5 text-slate-500" />
+                    </div>
+                    <div className="bg-slate-800 p-4 rounded-xl flex justify-between items-center cursor-pointer hover:bg-slate-700 transition-colors">
+                        <span className="font-bold text-slate-300">계정 설정</span> <Settings className="w-5 h-5 text-slate-500" />
+                    </div>
+                </div>
+            </div>
+        </main>
     );
 }

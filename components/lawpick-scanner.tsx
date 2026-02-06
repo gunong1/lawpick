@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { AlertTriangle, FileText, X, Loader2, Paperclip, Lock, ShieldAlert, ShieldQuestion, CheckCircle2, Stamp } from 'lucide-react';
+import { AlertTriangle, FileText, X, Loader2, Paperclip, Lock, ShieldAlert, ShieldQuestion, CheckCircle2, Stamp, ShieldCheck } from 'lucide-react';
 import { jsPDF } from 'jspdf'; // [복구] PDF 생성용
 import LegalDocModal, { LegalDocData } from './legal-doc-modal'; // [복구] 내용증명 모달
 
@@ -11,25 +11,48 @@ interface ScannerProps {
 
 export default function LawpickScanner({ onOpenAuth }: ScannerProps) {
     // --- [기존 로직 및 상태 유지] ---
-    const [analysis, setAnalysis] = useState<null | { score: number; level: string; summary: string; type: 'ERROR' | 'SAFE' | 'WARNING' | 'CRITICAL' }>(null);
+    const [analysis, setAnalysis] = useState<null | { score: number; level: string; summary: string; type: 'ERROR' | 'SAFE' | 'WARNING' | 'CRITICAL'; caseDetails?: { parties: string; date: string; amount: string; evidence: string; tags?: string[] }; actionItems?: string[] }>(null);
     const [loading, setLoading] = useState(false);
     const [inputText, setInputText] = useState('');
     const [attachedFile, setAttachedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // ★ [추가된 부분] 유료 회원 여부 확인
-    const [isPaidUser, setIsPaidUser] = useState(false);
+    // ★ [수정] 로그인 여부 확인 (로그인하면 잠금 해제)
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     // [복구] 내용증명 관련 상태
     const [showLegalDocModal, setShowLegalDocModal] = useState(false);
     const [isGeneratingLegalDoc, setIsGeneratingLegalDoc] = useState(false);
 
+    // 로그인 상태 체크 함수
+    const checkLoginStatus = () => {
+        const sessionUser = localStorage.getItem('session_user');
+        setIsLoggedIn(!!sessionUser);
+    };
+
     useEffect(() => {
-        // 로컬스토리지에서 '구독 여부' 확인 (결제하면 true로 바뀜)
-        const subscribed = localStorage.getItem('lawpick_subscription');
-        if (subscribed === 'true') {
-            setIsPaidUser(true);
-        }
+        // 초기 로그인 상태 확인
+        checkLoginStatus();
+
+        // storage 이벤트 리스너 (다른 탭에서 로그인/로그아웃 시)
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === 'session_user') {
+                checkLoginStatus();
+            }
+        };
+
+        // 커스텀 로그인 이벤트 리스너 (같은 탭에서 로그인 시)
+        const handleLoginEvent = () => {
+            checkLoginStatus();
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('lawpick_login', handleLoginEvent);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('lawpick_login', handleLoginEvent);
+        };
     }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,63 +61,140 @@ export default function LawpickScanner({ onOpenAuth }: ScannerProps) {
         }
     };
 
-    // --- [대표님이 만족하신 정밀 분석 로직 (건드리지 않음)] ---
+    // --- [Helper] 한글 금액 파싱 함수 ---
+    const parseKoreanAmount = (text: string): string => {
+        // 1. "1억 2천" 등 한글 만/억 단위 처리
+        const korUnitRegex = /(\d+)(?:억|만|천)?/g;
+        // 단순 숫자(300000)는 별도 처리, 여기서는 한글 섞인 것 우선
+
+        // 간단한 파서: 텍스트에서 금액으로 보이는 패턴을 모두 찾아 가장 큰 값을 반환 (보통 피해금액이 가장 큼)
+        const matches = text.match(/([0-9,]+)(?:\s*(억|천|만|원))+/g);
+        if (!matches) return '확인 필요';
+
+        let maxVal = 0;
+        let maxStr = '확인 필요';
+
+        matches.forEach(match => {
+            let val = 0;
+            const str = match.replace(/,/g, '');
+
+            // 억, 만, 천 단위 계산
+            let temp = str;
+            let currentUnitMult = 1;
+
+            if (str.includes('억')) {
+                const parts = str.split('억');
+                val += parseInt(parts[0] || '1') * 100000000;
+                temp = parts[1];
+            }
+            if (temp && temp.includes('만')) {
+                const parts = temp.split('만');
+                val += parseInt(parts[0] || '1') * 10000;
+                temp = parts[1];
+            }
+            if (temp && temp.includes('천')) {
+                val += parseInt(temp.replace('천', '') || '1') * 1000;
+            } else if (temp && parseInt(temp)) {
+                val += parseInt(temp);
+            }
+
+            if (val > maxVal) {
+                maxVal = val;
+                maxStr = val.toLocaleString() + '원';
+            }
+        });
+
+        return maxStr !== '확인 필요' ? maxStr : '확인 필요';
+    };
+
     const validateText = (text: string) => {
         const cleanText = text.replace(/\s/g, '');
-        if (cleanText.length < 20) return { valid: false, msg: '정보가 너무 부족합니다. 20자 이상 구체적으로 적어주세요.' };
-        const nonKoreanCount = (text.match(/[^가-힣a-zA-Z\s]/g) || []).length;
-        if (nonKoreanCount / text.length > 0.4) return { valid: false, msg: '유효하지 않은 문자(숫자/기호)가 너무 많습니다. 정확한 문장으로 설명해주세요.' };
-        const repeatRegex = /(.)\1{4,}/;
-        if (repeatRegex.test(text)) return { valid: false, msg: '반복된 문자가 감지되었습니다. 장난성 입력은 분석할 수 없습니다.' };
+        if (cleanText.length < 10) return { valid: false, msg: '정보가 너무 부족합니다. 10자 이상 구체적으로 적어주세요.' };
         return { valid: true, msg: '' };
     };
 
-    const handleAnalyze = () => {
+    const handleAnalyze = async () => {
         if (!inputText && !attachedFile) return;
         setLoading(true);
 
-        setTimeout(() => {
+        // 1. 파일첨부 케이스 (기존 유지)
+        if (attachedFile && !inputText) {
             setLoading(false);
+            setAnalysis({
+                score: 88, level: 'CRITICAL', type: 'CRITICAL',
+                summary: '업로드된 파일에서 독소 조항이 감지되었습니다.',
+                caseDetails: { parties: '임대인 / 임차인', date: '계약일로부터 즉시', amount: '보증금 전액', evidence: '업로드된 파일' },
+                actionItems: ['특약 조항 수정 요구', '계약 전 보증보험 가입 확인']
+            });
+            return;
+        }
 
-            // 1. 파일만 있는 경우
-            if (attachedFile && !inputText) {
+        // 2. 텍스트 검증
+        const validation = validateText(inputText);
+        if (!validation.valid) {
+            setLoading(false);
+            setAnalysis({ score: 0, level: 'UNKNOWN', summary: validation.msg, type: 'ERROR' });
+            return;
+        }
+
+        // ----------------------------------------------------------------
+        // [AI Integration] Server API Call
+        // ----------------------------------------------------------------
+        try {
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: inputText })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
                 setAnalysis({
-                    score: 88, level: 'CRITICAL', type: 'CRITICAL',
-                    summary: '업로드된 계약서 파일에서 독소 조항(특약 제3조)이 감지되었습니다. 임차인에게 불리한 원상복구 의무가 포함되어 있습니다.'
+                    score: 0,
+                    level: 'UNKNOWN',
+                    summary: result.error || '분석 중 오류가 발생했습니다.',
+                    type: 'ERROR'
                 });
                 return;
             }
 
-            // 2. 텍스트 검증 (스팸 필터)
-            const validation = validateText(inputText);
-            if (!validation.valid) {
-                setAnalysis({ score: 0, level: 'UNKNOWN', summary: validation.msg, type: 'ERROR' });
-                return;
-            }
+            const data = result.data;
 
-            // 3. 키워드 분석
-            const keywords = {
-                critical: ['사기', '고소', '경찰', '횡령', '잠적', '피해', '안줌', '미지급', '폭행', '감옥'],
-                warning: ['전세', '보증금', '월세', '계약', '해지', '파기', '내용증명', '이자', '빚', '차용'],
-                safe: ['안녕하세요', '문의', '궁금', '상담', '법률']
+            // UI용 데이터 매핑 (API 응답 -> State)
+            const caseDetails = {
+                parties: data.keyFacts.who,
+                date: data.keyFacts.when,
+                amount: data.keyFacts.money,
+                evidence: data.keyFacts.evidenceStatus,
+                // tags: data.legalCategories // tags를 caseDetails에 포함 (UI 호환성)
             };
 
-            let detectedLevel = 'SAFE';
-            let score = 15;
-            const hasCritical = keywords.critical.some(k => inputText.includes(k));
-            const hasWarning = keywords.warning.some(k => inputText.includes(k));
+            // 태그 렌더링을 위해 analysis 객체에 type별 로직 대신 API가 준 카테고리 활용
+            // *Disclaimer: 기존 UI는 analysis.type에 따라 하드코딩된 태그를 보여주므로,
+            // 이를 동적으로 보여주려면 렌더링 부분도 수정해야 함. 
+            // 일단은 summary에 핵심 내용을 담고, 기존 구조 최대한 활용.
 
-            if (hasCritical) { detectedLevel = 'CRITICAL'; score = Math.floor(Math.random() * (98 - 85 + 1)) + 85; }
-            else if (hasWarning) { detectedLevel = 'WARNING'; score = Math.floor(Math.random() * (75 - 45 + 1)) + 45; }
-            else { detectedLevel = 'SAFE'; score = Math.floor(Math.random() * (20 - 10 + 1)) + 10; }
+            setAnalysis({
+                score: data.score,
+                level: data.type, // SAFE, WARNING, CRITICAL
+                summary: data.caseBrief + (data.riskReason ? `\n\n[위험 진단] ${data.riskReason}` : ''),
+                type: data.type,
+                caseDetails: { ...caseDetails, tags: data.legalCategories }, // tags hack for UI if needed
+                actionItems: data.actionItems
+            });
 
-            let summaryText = '';
-            if (detectedLevel === 'CRITICAL') summaryText = '심각한 법적 분쟁 위험이 감지되었습니다. 형사 처벌 대상이 될 수 있는 요소가 포함되어 있거나, 재산상의 큰 피해가 예상됩니다. 즉각적인 법적 대응(내용증명/고소)이 필요합니다.';
-            else if (detectedLevel === 'WARNING') summaryText = '계약 불이행 또는 민사 분쟁의 소지가 발견되었습니다. 현재 단계에서 증거를 확보하고 내용증명을 발송하여 상대방을 압박하는 것이 유리합니다.';
-            else summaryText = '입력하신 내용에서는 즉각적인 법적 위험이 발견되지 않았습니다. (안전). 다만, 추후 상황 변화에 대비해 관련 기록을 남겨두시는 것을 권장합니다.';
-
-            setAnalysis({ score, level: detectedLevel, summary: summaryText, type: detectedLevel as any });
-        }, 1500);
+        } catch (error) {
+            console.error('Analysis failed:', error);
+            setAnalysis({
+                score: 0,
+                level: 'UNKNOWN',
+                summary: '서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+                type: 'ERROR'
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     // [복구] 내용증명 PDF 생성 함수
@@ -225,7 +325,31 @@ export default function LawpickScanner({ onOpenAuth }: ScannerProps) {
                 yPos += 8;
             }
 
-            // 4. 경고문 (warning) - 살벌한 고정 경고문
+            // 4. 요구 사항 (demands) - 새로 추가
+            if (legalData.demands && legalData.demands.length > 0) {
+                yPos += 3;
+                doc.setFontSize(12);
+                doc.text('[ 요 구 사 항 ]', 20, yPos);
+                yPos += 10;
+                doc.setFontSize(11);
+
+                legalData.demands.forEach((demand: string, index: number) => {
+                    if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 30;
+                    }
+                    const demandText = `${index + 1}. ${demand}`;
+                    const demandLines = doc.splitTextToSize(demandText, 165);
+                    demandLines.forEach((line: string) => {
+                        doc.text(line, 25, yPos);
+                        yPos += 7;
+                    });
+                    yPos += 2;
+                });
+                yPos += 5;
+            }
+
+            // 5. 경고문 (warning) - 빨간색 강조
             if (legalData.warning) {
                 doc.setTextColor(180, 0, 0); // 빨간색 강조
                 const warningLines = doc.splitTextToSize(legalData.warning, 170);
@@ -287,84 +411,159 @@ export default function LawpickScanner({ onOpenAuth }: ScannerProps) {
                 </div>
             ) : (
                 // --- [결과 화면 (여기가 업그레이드됨)] ---
-                <div className="p-8 text-center animate-in fade-in zoom-in duration-300">
+                <div className="p-6 bg-white animate-in fade-in zoom-in duration-300">
 
-                    {/* 에러(0점) 및 안전(15점) 화면은 기존과 동일 */}
+                    {/* 에러(0점) 화면 - 기존 유지 */}
                     {analysis.type === 'ERROR' && (
-                        <>
+                        <div className="text-center py-10">
                             <div className="w-20 h-20 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-6"><ShieldQuestion className="w-10 h-10" /></div>
                             <h3 className="text-3xl font-black text-slate-900 mb-2">분석 불가 <span className="text-slate-400">0점</span></h3>
                             <div className="inline-block px-3 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-full mb-6">입력 정보 오류</div>
                             <p className="text-slate-600 mb-8 bg-slate-50 p-4 rounded-xl text-left text-sm leading-relaxed border border-slate-200"><strong>[AI 알림]</strong><br />{analysis.summary}</p>
-                        </>
+                            <button onClick={() => { setAnalysis(null); setInputText(''); setAttachedFile(null); }} className="w-full bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 shadow-lg">
+                                다른 내용 진단하기
+                            </button>
+                        </div>
                     )}
 
-                    {analysis.type === 'SAFE' && (
-                        <>
-                            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-10 h-10" /></div>
-                            <h3 className="text-3xl font-black text-slate-900 mb-2">안전 <span className="text-green-600">{analysis.score}점</span></h3>
-                            <div className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full mb-6">위험 요소 미발견 (SAFE)</div>
-                            <div className="bg-slate-50 p-4 rounded-xl text-left text-sm leading-relaxed border border-slate-200 mb-8 text-slate-600">{analysis.summary}</div>
-                        </>
-                    )}
+                    {(analysis.type === 'SAFE' || analysis.type === 'WARNING' || analysis.type === 'CRITICAL') && (
+                        <div className="space-y-6">
 
-                    {/* ★ [핵심] 주의/위험 단계 -> '결제 여부'에 따라 다르게 보여줌 */}
-                    {(analysis.type === 'WARNING' || analysis.type === 'CRITICAL') && (
-                        <>
-                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${analysis.type === 'CRITICAL' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                                {analysis.type === 'CRITICAL' ? <ShieldAlert className="w-10 h-10" /> : <AlertTriangle className="w-10 h-10" />}
-                            </div>
-                            <h3 className="text-3xl font-black text-slate-900 mb-2">위험도 <span className={analysis.type === 'CRITICAL' ? 'text-red-600' : 'text-yellow-600'}>{analysis.score}점</span></h3>
-                            <div className={`inline-block px-3 py-1 text-xs font-bold rounded-full mb-6 ${analysis.type === 'CRITICAL' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {analysis.type === 'CRITICAL' ? '심각 단계 (CRITICAL)' : '주의 단계 (CAUTION)'}
+                            {/* 1. 최상단 면책 조항 (노란 박스) */}
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start text-orange-800 text-xs">
+                                <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" />
+                                <span>본 결과는 <strong>AI 분석 결과</strong>이며, 최종 판단은 <strong>전문 변호사</strong>를 통해 확정하세요.</span>
                             </div>
 
-                            {/* 블러 처리 및 잠금 UI */}
-                            <div className="relative mb-8 rounded-xl overflow-hidden border border-slate-200 text-left">
-                                {/* 결제했으면(isPaidUser) 블러 제거, 안 했으면 블러 적용 */}
-                                <div className={`p-4 bg-slate-50 text-slate-600 text-sm leading-relaxed ${isPaidUser ? '' : 'blur-sm select-none'}`}>
-                                    <strong>[AI 상세 분석]</strong><br />
-                                    {analysis.summary}
-                                    <br /><br />
-                                    {/* 결제한 사람에게만 보이는 진짜 솔루션 */}
-                                    {isPaidUser ? (
-                                        <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg text-blue-900 animate-in fade-in duration-500">
-                                            <strong>💡 AI 솔루션 가이드</strong><br />
-                                            1. 현재 상황은 법적으로 '이행 지체'에 해당할 가능성이 높습니다.<br />
-                                            2. 2023다12345 판례에 의거, 즉시 계약 해지 통보가 가능합니다.<br />
-                                            3. 아래 버튼을 눌러 변호사가 작성한 듯한 내용증명을 무료로 생성하세요.
-                                        </div>
+                            {/* 2. 사건 브리핑 (AI 요약) */}
+                            <div className="bg-slate-50 rounded-xl p-5 border-l-4 border-slate-900">
+                                <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                    <FileText className="w-4 h-4" /> 사건 브리핑
+                                </h4>
+                                <p className="text-slate-700 text-sm leading-relaxed">
+                                    {analysis.summary?.split('\n')[0] || '분석 결과를 확인해주세요.'}
+                                </p>
+                            </div>
+
+                            {/* 3. 법적 쟁점 (API 태그 사용) */}
+                            <div>
+                                <h4 className="font-bold text-slate-900 text-sm mb-2 flex items-center gap-2">
+                                    <Paperclip className="w-4 h-4 rotate-45" /> 법적 쟁점
+                                </h4>
+                                <div className="flex gap-2 flex-wrap">
+                                    {analysis.caseDetails?.tags && analysis.caseDetails.tags.length > 0 ? (
+                                        analysis.caseDetails.tags.map((tag: string, i: number) => (
+                                            <span key={i} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+                                                #{tag.replace(/^#/, '')}
+                                            </span>
+                                        ))
                                     ) : (
-                                        "(유료 회원은 여기에 관련 판례와 대처 방안이 상세하게 표시됩니다...)"
+                                        <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">#법률상담</span>
                                     )}
                                 </div>
+                            </div>
 
-                                {/* 결제 안 했으면 자물쇠 덮어씌우기 */}
-                                {!isPaidUser && (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px]">
-                                        <Lock className="w-8 h-8 text-slate-400 mb-2" />
-                                        <p className="text-slate-900 font-bold text-sm">상세 분석 내용은 멤버십 전용입니다.</p>
+                            {/* 4. 위험도 분석 (원형 게이지 스타일) */}
+                            <div className="bg-white border rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-slate-900 mb-1 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> 위험도 분석</h4>
+                                    <div className={`text-xs font-bold px-2 py-1 rounded inline-block mt-2 ${analysis.type === 'CRITICAL' ? 'bg-red-100 text-red-700' :
+                                        analysis.type === 'WARNING' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                                        }`}>
+                                        {analysis.type === 'CRITICAL' ? '심각 단계 (CRITICAL)' :
+                                            analysis.type === 'WARNING' ? '주의 단계 (CAUTION)' : '안전 (SAFE)'}
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        {analysis.summary.split('.')[0]}.
+                                    </p>
+                                </div>
+                                <div className={`w-24 h-24 rounded-full flex items-center justify-center border-8 text-2xl font-black ${analysis.type === 'CRITICAL' ? 'border-red-500 text-red-600' :
+                                    analysis.type === 'WARNING' ? 'border-yellow-400 text-yellow-600' : 'border-green-500 text-green-600'
+                                    }`}>
+                                    {analysis.score}
+                                </div>
+                            </div>
+
+                            {/* 5. 상세 정보 그리드 (동적 데이터 적용 + 프리미엄 블러) */}
+                            <div className="relative rounded-xl overflow-hidden">
+                                <div className={`grid grid-cols-2 gap-3 ${!isLoggedIn ? 'blur-sm select-none opacity-60' : ''}`}>
+                                    <div className="bg-slate-50 p-4 rounded-xl text-center">
+                                        <div className="text-xs text-slate-400 mb-1">당사자</div>
+                                        <div className="text-sm font-bold text-slate-800">{analysis.caseDetails?.parties || '의뢰인 / 상대방'}</div>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-xl text-center">
+                                        <div className="text-xs text-slate-400 mb-1">발생 시기</div>
+                                        <div className={`text-sm font-bold ${analysis.caseDetails?.date !== '미상' ? 'text-blue-600' : 'text-slate-800'}`}>
+                                            {analysis.caseDetails?.date || '미상'}
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-xl text-center">
+                                        <div className="text-xs text-slate-400 mb-1">피해 금액</div>
+                                        <div className={`text-sm font-bold ${analysis.caseDetails?.amount !== '확인 필요' ? 'text-red-600' : 'text-slate-800'}`}>
+                                            {analysis.caseDetails?.amount || '확인 필요'}
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-xl text-center">
+                                        <div className="text-xs text-slate-400 mb-1">참고 자료</div>
+                                        <div className={`text-sm font-bold ${analysis.caseDetails?.evidence !== '확인 필요' ? 'text-green-600' : 'text-slate-800'}`}>
+                                            {analysis.caseDetails?.evidence || '확인 필요'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 잠금 화면 오버레이 */}
+                                {!isLoggedIn && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                                        <Lock className="w-6 h-6 text-slate-400 mb-1" />
+                                        <span className="text-xs font-bold text-slate-500">멤버십 전용 상세 정보</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* 버튼도 상태에 따라 변경 */}
-                            {!isPaidUser ? (
-                                <button className="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 transition-colors shadow-lg hover:shadow-red-500/30 mb-3 animate-pulse" onClick={onOpenAuth}>
-                                    월 4,900원으로 전체 내용 확인하기
-                                </button>
-                            ) : (
-                                <button className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg mb-3" onClick={() => setShowLegalDocModal(true)}>
-                                    <Stamp className="w-4 h-4 mr-2 inline" />
-                                    AI 내용증명 작성하러 가기
-                                </button>
-                            )}
-                        </>
-                    )}
+                            {/* 6. 필요 조치 (Action Items) - 동적 생성 리스트 (노란 박스) */}
+                            <div className="relative rounded-xl overflow-hidden">
+                                <div className={`bg-orange-50 p-5 rounded-xl border border-orange-100 ${!isLoggedIn ? 'blur-sm select-none' : ''}`}>
+                                    <h4 className="font-bold text-orange-900 mb-3 flex items-center gap-2">
+                                        <CheckCircle2 className="w-5 h-5" /> 필요 조치 (Action Items)
+                                    </h4>
+                                    <ul className="space-y-2 text-sm text-orange-800">
+                                        {analysis.actionItems?.map((item, index) => (
+                                            <li key={index} className="flex items-start gap-2">
+                                                <span className="bg-orange-200 text-orange-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0">{index + 1}</span>
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
-                    <button onClick={() => { setAnalysis(null); setInputText(''); setAttachedFile(null); }} className={`text-slate-400 text-sm hover:text-slate-600 underline ${analysis.type === 'ERROR' || analysis.type === 'SAFE' ? 'w-full bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 no-underline shadow-lg' : ''}`}>
-                        {analysis.type === 'ERROR' || analysis.type === 'SAFE' ? '다른 내용 진단하기' : '다시 진단하기'}
-                    </button>
+                                {/* 잠금 화면 오버레이 */}
+                                {!isLoggedIn && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[1px] z-10">
+                                        <div className="text-center">
+                                            <p className="text-sm font-bold text-slate-800 mb-2">구체적인 대처 방안이 궁금하신가요?</p>
+                                            <button onClick={onOpenAuth} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg animate-pulse">
+                                                지금 무료로 확인하기
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 7. 하단 버튼 */}
+                            <div className="pt-4">
+                                {isLoggedIn && analysis.type !== 'SAFE' && (
+                                    <button className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors shadow-lg mb-3 flex items-center justify-center" onClick={() => setShowLegalDocModal(true)}>
+                                        <Stamp className="w-5 h-5 mr-2" />
+                                        AI 내용증명 작성하러 가기
+                                    </button>
+                                )}
+
+                                <button onClick={() => { setAnalysis(null); setInputText(''); setAttachedFile(null); }} className="w-full text-slate-400 text-sm hover:text-slate-600 underline">
+                                    다시 진단하기
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
