@@ -70,9 +70,18 @@ const SYSTEM_PROMPT = `당신은 법률 분쟁 분석 전문 AI입니다.
 }
 
 [점수]
-- 0-30: SAFE
-- 31-70: WARNING
-- 71-100: CRITICAL`;
+- 0: 정보 부족 / 판단 불가 (예: "사기 당함", "힘들다" 등 구체적 사실관계 없음)
+- 10-30: SAFE (단순 상담, 법적 위험 낮음)
+- 31-70: WARNING (내용증명 등 조치 필요)
+- 71-100: CRITICAL (시급한 대응, 소송/형사고소 필요)
+
+===== [중요] 정보 부족 시 처리 =====
+입력 내용이 너무 모호하거나 구체적인 사실관계(누가, 언제, 무엇을, 어떻게)가 부족하여 법적 판단을 내리기 어려운 경우:
+- score: 0
+- type: "SAFE"
+- caseBrief: "입력된 정보가 부족하여 법적 분석이 어렵습니다. 구체적인 사실위주로 다시 작성해주세요."
+- riskReason: "구체적인 사실관계(피해 금액, 상대방의 행위, 날짜 등)가 파악되지 않아 위험도를 산정할 수 없습니다."
+- actionItems: ["육하원칙에 따라 다시 작성", "계약서 등 증거 자료 확인"]`;
 
 export async function POST(req: Request) {
     try {
@@ -383,13 +392,13 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
         whoForKeyFacts = '의뢰인: 임차인 / 상대방: 임대인';
         caseBrief = '임차인인 의뢰인이 임대인으로부터 보증금을 반환받지 못하는 사안입니다.';
     } else {
-        score = 50;
-        type = 'WARNING';
-        riskReason = '구체적인 사실관계 확인 후 법적 대응 방향 설정이 필요합니다.';
-        actionItems.push('관련 자료 수집', '전문가 상담');
+        score = 0;
+        type = 'SAFE';
+        riskReason = '구체적인 사실관계(피해 금액, 상대방의 행위 등)가 부족하여 위험도를 산정할 수 없습니다.';
+        actionItems.push('육하원칙에 맞춰 구체적으로 재작성', '증거 자료(계약서, 문자 등) 확인');
         legalCategories.push('법률상담');
-        whoForKeyFacts = '의뢰인: 신청인 / 상대방: 피신청인';
-        caseBrief = '입력된 내용을 바탕으로 법적 검토가 필요한 사안입니다.';
+        whoForKeyFacts = '미상';
+        caseBrief = '입력된 정보가 부족하여 법적 분석이 어렵습니다. 구체적인 상황을 입력해주세요.';
     }
 
     return {

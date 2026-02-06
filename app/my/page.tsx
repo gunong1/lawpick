@@ -52,15 +52,31 @@ export default function MyPage() {
         }
     };
 
-    const handleRegisterCard = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (cardNumber.p1.length < 4 || cardNumber.p4.length < 4) {
-            alert('카드 정보를 올바르게 입력해주세요.');
-            return;
-        }
-        setHasCard(true);
-        setIsCardFormOpen(false);
-        alert('카드가 안전하게 등록되었습니다.\n이제 멤버십 가입이 가능합니다.');
+    const handleRegisterCard = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!window.IMP) return;
+
+        // 로컬 스토리지에 저장된 카카오 정보 가져오기
+        const userEmail = localStorage.getItem('user_email') || `user_${new Date().getTime()}`;
+        const userName = localStorage.getItem('session_user') || '고객';
+
+        window.IMP.request_pay({
+            pg: 'html5_inicis',
+            pay_method: 'card',
+            merchant_uid: `card_reg_${new Date().getTime()}`,
+            name: '로픽 멤버십 정기결제 카드 등록',
+            amount: 0,
+            customer_uid: userEmail, // [중요] 카카오 이메일을 결제 ID로 사용
+            buyer_email: userEmail,
+            buyer_name: userName,
+        }, (rsp: any) => {
+            if (rsp.success) {
+                alert('카드가 성공적으로 등록되었습니다! (정기결제 준비 완료)');
+                setHasCard(true);
+            } else {
+                alert(`카드 등록 실패: ${rsp.error_msg}`);
+            }
+        });
     };
 
     const handleSubscribe = () => {
