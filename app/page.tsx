@@ -101,12 +101,38 @@ export default function Home() {
                     <strong className="text-white">로픽(LawPick) 멤버십</strong>으로 미리 예방하세요.
                 </p>
 
+                {/* 3가지 핵심 기능 - 히어로 바로 아래 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
+                    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20 text-left">
+                        <AlertTriangle className="text-red-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
+                        <h3 className="font-bold text-xl mb-2 text-white">01. 위험 감지</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">
+                            AI가 계약서와 상황을 실시간으로 분석하여 독소 조항과 법적 위험을 사전에 감지합니다.
+                        </p>
+                    </div>
+                    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20 text-left">
+                        <Lock className="text-yellow-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
+                        <h3 className="font-bold text-xl mb-2 text-white">02. 내용증명 발송</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">
+                            변호사 명의의 경고장으로 상대방을 압박하여 소송 전 분쟁을 조기에 종결합니다.
+                        </p>
+                    </div>
+                    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20 text-left">
+                        <CheckCircle2 className="text-blue-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
+                        <h3 className="font-bold text-xl mb-2 text-white">03. 소송 비용 지원</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">
+                            로픽 멤버십 회원은 소송 발생 시 규정에 따라 변호사 선임비를 지원받습니다.
+                        </p>
+                    </div>
+                </div>
+
+                {/* 스캐너 (채팅창) */}
                 <div className="max-w-xl mx-auto bg-white/5 rounded-3xl border border-white/10 p-2 shadow-2xl backdrop-blur-sm relative z-10">
                     <LawpickScanner onOpenAuth={() => setIsAuthModalOpen(true)} />
                 </div>
             </section>
 
-            {/* 3. Social Proof */}
+            {/* 4. Social Proof - 사용자 후기 */}
             <section className="py-16 bg-[#0b1120] border-y border-white/5 overflow-hidden">
                 <div className="container mx-auto px-4 mb-10 text-center">
                     <div className="grid grid-cols-3 gap-4 text-center max-w-4xl mx-auto mb-12 divide-x divide-slate-800">
@@ -164,34 +190,7 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* 4. Why Lawpick */}
-            <section className="py-20 bg-[#0f172a]">
-                <div className="container mx-auto px-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20">
-                            <AlertTriangle className="text-red-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-                            <h3 className="font-bold text-xl mb-2 text-white">01. 위험 감지</h3>
-                            <p className="text-slate-400 text-sm leading-relaxed">
-                                AI가 계약서와 상황을 실시간으로 분석하여 독소 조항과 법적 위험을 사전에 감지합니다.
-                            </p>
-                        </div>
-                        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20">
-                            <Lock className="text-yellow-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-                            <h3 className="font-bold text-xl mb-2 text-white">02. 내용증명 발송</h3>
-                            <p className="text-slate-400 text-sm leading-relaxed">
-                                변호사 명의의 경고장으로 상대방을 압박하여 소송 전 분쟁을 조기에 종결합니다.
-                            </p>
-                        </div>
-                        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20">
-                            <CheckCircle2 className="text-blue-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-                            <h3 className="font-bold text-xl mb-2 text-white">03. 소송 비용 지원</h3>
-                            <p className="text-slate-400 text-sm leading-relaxed">
-                                로픽 멤버십 회원은 소송 발생 시 규정에 따라 변호사 선임비를 지원받습니다.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
+
 
             {/* 5. Partner Lawyers */}
             <section className="py-10 px-4">
