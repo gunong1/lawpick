@@ -88,7 +88,7 @@ export default function ChatDemo() {
     return (
         <section className="bg-slate-50 py-10">
             <div className="px-6 max-w-md mx-auto w-full">
-                <h3 className="text-xl font-bold text-navy-900 mb-6 text-center">
+                <h3 className="text-xl font-bold text-slate-900 mb-6 text-center">
                     AI 변호사에게 물어보세요
                 </h3>
 
@@ -136,7 +136,7 @@ export default function ChatDemo() {
                                 <div
                                     className={clsx(
                                         "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm",
-                                        m.role === "user" ? "bg-navy-900" : "bg-blue-500"
+                                        m.role === "user" ? "bg-slate-900" : "bg-blue-500"
                                     )}
                                 >
                                     {m.role === "user" ? (
@@ -149,7 +149,7 @@ export default function ChatDemo() {
                                     className={clsx(
                                         "p-3 rounded-2xl text-sm leading-relaxed shadow-sm",
                                         m.role === "user"
-                                            ? "bg-navy-900 text-white rounded-tr-none"
+                                            ? "bg-slate-900 text-white rounded-tr-none"
                                             : "bg-white text-slate-700 border border-slate-100 rounded-tl-none"
                                     )}
                                     style={{ whiteSpace: "pre-wrap" }}

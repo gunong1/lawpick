@@ -12,6 +12,7 @@
         "@ai-sdk/google": "^3.0.21",
         "@ai-sdk/openai": "^3.0.25",
         "@ai-sdk/react": "^3.0.73",
+        "@google/generative-ai": "^0.24.1",
         "ai": "^6.0.71",
         "clsx": "^2.1.1",
         "framer-motion": "^12.31.0",
