@@ -66,7 +66,7 @@ export default function LawpickScanner() {
                 </button>
             </div>
 
-            {result && (
+            {result && typeof result.score === 'number' && (
                 <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className={`text-center p-6 rounded-2xl border-2 ${getScoreColor(result.score)}`}>
                         <span className="text-sm font-bold opacity-80 uppercase tracking-widest">Risk Score</span>
