@@ -33,6 +33,31 @@ export default function TermsPage() {
                     </p>
                 </section>
 
+                <section className="space-y-4 pt-8 border-t border-slate-100">
+                    <h2 className="text-xl font-black text-slate-900 mb-4">제5장 품질 보증 및 보상 규정</h2>
+
+                    <h3 className="text-lg font-bold text-slate-900">제19조 (목적 및 정의)</h3>
+                    <p>
+                        회사는 회원이 유료 결제한 'AI 내용증명 솔루션'의 기술적 완성도를 보증하기 위하여 '로픽 책임 보상제'를 운영합니다.
+                        이는 보험금이 아니며, 제품 하자에 대한 위약금 성격의 보상금입니다.
+                    </p>
+
+                    <h3 className="text-lg font-bold text-slate-900">제20조 (보상 지급 요건)</h3>
+                    <ul className="list-disc pl-5 space-y-1 text-sm">
+                        <li>로픽 멤버십 유료 회원 자격 유지.</li>
+                        <li>솔루션을 통해 생성된 서면을 적법하게 발송함.</li>
+                        <li>발송 후 60일 내 분쟁 미해결 및 법원으로부터 소장(본안 소송)을 송달받음.</li>
+                    </ul>
+
+                    <h3 className="text-lg font-bold text-slate-900">제21조 (면책 및 지급 제외 사유)</h3>
+                    <p className="mb-2">다음의 경우 사용자 귀책으로 간주하여 보상하지 않습니다.</p>
+                    <ul className="list-disc pl-5 space-y-1 text-sm">
+                        <li>[불법 행위] 형사 범죄(사기, 폭행 등) 및 반사회적 행위.</li>
+                        <li>[신의칙 위반] 유책 배우자의 이혼 소구, 고의적 채무 불이행 등 도덕적 해이.</li>
+                        <li>[오남용] 허위 정보 입력, 상대방과의 통모(부정 수급 시도).</li>
+                    </ul>
+                </section>
+
                 <div className="mt-12 pt-6 border-t border-slate-100 text-center">
                     <a href="/" className="inline-block px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">
                         돌아가기

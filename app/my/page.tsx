@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CreditCard, CheckCircle2, AlertTriangle, ShieldCheck, ChevronRight, Settings, Home, LogOut } from 'lucide-react';
+import { CreditCard, CheckCircle2, AlertTriangle, ShieldCheck, ChevronRight, Settings, Home, LogOut, Upload, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function MyPage() {
     const [userName, setUserName] = useState('고객');
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [hasCard, setHasCard] = useState(false);
+
+    // [New] Warranty & Claim State
+    const [isWarrantyAgreed, setIsWarrantyAgreed] = useState(false);
+    const [claimStatus, setClaimStatus] = useState<'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'>('NONE');
+    const [showClaimForm, setShowClaimForm] = useState(false);
+    const [accountNum, setAccountNum] = useState('');
 
     useEffect(() => {
         // 1. 로그인 세션 확인
@@ -26,6 +32,10 @@ export default function MyPage() {
             // 이미지에서 확인한 '고객사 식별코드'를 넣었습니다.
             window.IMP.init('imp02261832');
         }
+
+        // 4. [New] 보상 청구 상태 확인
+        const savedClaimStatus = localStorage.getItem('lawpick_claim_status') as any;
+        if (savedClaimStatus) setClaimStatus(savedClaimStatus);
     }, []);
 
     // 로그아웃 함수
@@ -52,6 +62,11 @@ export default function MyPage() {
 
     // ★ 다날 정기결제 빌링키 발급 함수
     const handleRegisterCard = () => {
+        if (!isWarrantyAgreed) {
+            alert('필수 약관(품질 보증 제한 동의)에 동의해주세요.');
+            return;
+        }
+
         if (!window.IMP) {
             alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
             return;
@@ -88,6 +103,11 @@ export default function MyPage() {
             return;
         }
 
+        if (!isWarrantyAgreed) {
+            alert('필수 약관(품질 보증 제한 동의)에 동의해주세요.');
+            return;
+        }
+
         if (confirm('월 4,900원 멤버십을 구독하시겠습니까?\n(테스트 모드: 실제 돈은 나가지 않습니다)')) {
             setIsSubscribed(true);
             // 구독 성공 도장 찍기
@@ -95,6 +115,21 @@ export default function MyPage() {
             alert('환영합니다! 로픽 멤버십이 활성화되었습니다.\n이제 진단 결과의 모든 잠금이 해제됩니다.');
             // 메인으로 이동
             window.location.href = '/';
+        }
+    };
+
+    // [New] 보상 청구 제출 함수
+    const handleSubmitClaim = () => {
+        if (!accountNum) {
+            alert('입금받을 계좌번호를 입력해주세요.');
+            return;
+        }
+
+        if (confirm('보상 신청을 제출하시겠습니까?\n허위 사실 입력 시 보상이 거절될 수 있습니다.')) {
+            localStorage.setItem('lawpick_claim_status', 'PENDING');
+            setClaimStatus('PENDING');
+            setShowClaimForm(false);
+            alert('보상 신청이 접수되었습니다.\n담당자가 내용을 검토한 후 연락드리겠습니다.');
         }
     };
 
@@ -154,9 +189,24 @@ export default function MyPage() {
                             <h3 className="font-bold mb-2 flex items-center"><AlertTriangle className="w-4 h-4 text-yellow-500 mr-2" />구독이 필요합니다</h3>
                             <p className="text-sm text-slate-400 mb-4">카드 등록하고 첫 달 무료 혜택을 받아보세요.</p>
 
+                            <div className="mb-4 p-3 bg-slate-900 rounded border border-slate-700">
+                                <label className="flex items-start gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="mt-1 w-4 h-4 accent-blue-600"
+                                        checked={isWarrantyAgreed}
+                                        onChange={(e) => setIsWarrantyAgreed(e.target.checked)}
+                                    />
+                                    <span className="text-xs text-slate-300 leading-relaxed">
+                                        <strong className="text-blue-400">[필수] 품질 보증 제한(면책) 동의</strong><br />
+                                        본인은 범죄 행위, 유책 배우자(도덕적 귀책), 허위 사실 입력 등에 해당하지 않음을 확인하며, 이에 해당할 경우 보상금 지급이 거절됨에 동의합니다.
+                                    </span>
+                                </label>
+                            </div>
+
                             {!hasCard ? (
                                 <button onClick={handleRegisterCard} className="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-lg font-bold flex items-center justify-center transition-colors">
-                                    <CreditCard className="w-4 h-4 mr-2" /> 결제 수단 등록하기
+                                    <CreditCard className="w-4 h-4 mr-2" /> 결제 수단 등록하기 (동의 필수)
                                 </button>
                             ) : (
                                 <button onClick={handleSubscribe} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold flex items-center justify-center transition-colors animate-pulse">
@@ -172,6 +222,74 @@ export default function MyPage() {
                         </div>
                     )}
                 </div>
+
+                {/* [New] Compensation Claim Section */}
+                {isSubscribed && (
+                    <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-lg text-white">솔루션 실패 보상 신청</h3>
+                            {claimStatus === 'PENDING' && <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded font-bold">심사 중</span>}
+                            {claimStatus === 'APPROVED' && <span className="text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded font-bold">승인됨</span>}
+                            {claimStatus === 'REJECTED' && <span className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded font-bold">거절됨</span>}
+                        </div>
+
+                        {claimStatus === 'NONE' ? (
+                            !showClaimForm ? (
+                                <div className="text-center py-6 bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">
+                                    <p className="text-slate-400 text-sm mb-4">
+                                        로픽 솔루션으로 해결되지 않고 소송이 제기되었나요?<br />
+                                        제품 하자에 대한 책임을 다하겠습니다.
+                                    </p>
+                                    <button
+                                        onClick={() => setShowClaimForm(true)}
+                                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-bold transition-colors"
+                                    >
+                                        보상 신청하기 (최대 300만 원)
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">증빙 자료 제출 (필수)</label>
+                                        <div className="border border-slate-700 rounded-lg p-4 flex flex-col items-center justify-center bg-slate-800 cursor-pointer hover:bg-slate-750 transition-colors">
+                                            <FileText className="w-6 h-6 text-slate-500 mb-2" />
+                                            <span className="text-xs text-slate-400">법원 소장(부본) 또는 소송 안내서를 업로드하세요</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">입금 계좌번호</label>
+                                        <input
+                                            type="text"
+                                            placeholder="은행명 / 계좌번호 / 예금주"
+                                            value={accountNum}
+                                            onChange={(e) => setAccountNum(e.target.value)}
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button
+                                            onClick={() => setShowClaimForm(false)}
+                                            className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-bold transition-colors"
+                                        >
+                                            취소
+                                        </button>
+                                        <button
+                                            onClick={handleSubmitClaim}
+                                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold transition-colors"
+                                        >
+                                            제출하기
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        ) : (
+                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 text-center">
+                                <div className="text-sm text-slate-300 mb-1">보상 심사가 진행 중입니다.</div>
+                                <div className="text-xs text-slate-500">영업일 기준 3~5일 소요됩니다.</div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* 하단 메뉴 리스트 */}
                 <div className="space-y-3">
