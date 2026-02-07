@@ -4,12 +4,6 @@ import { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle2, AlertTriangle, ShieldCheck, ChevronRight, Settings, Home, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
-declare global {
-    interface Window {
-        IMP: any;
-    }
-}
-
 export default function MyPage() {
     const [userName, setUserName] = useState('고객');
     const [isSubscribed, setIsSubscribed] = useState(false);
