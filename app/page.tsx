@@ -88,17 +88,17 @@ export default function Home() {
             <section className="pt-32 pb-16 px-4 text-center">
                 <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-blue-900/30 border border-blue-500/30 text-blue-400 text-sm font-bold mb-6 tracking-wide hover:bg-blue-900/40 transition-colors cursor-default">
                     <ShieldCheck className="w-4 h-4 mr-2" />
-                    국내 최초 법률 방어 시스템
+                    국내 최초 법률 솔루션 책임 보증제
                 </div>
 
                 <h1 className="text-4xl md:text-6xl font-black tracking-tight mb-6 leading-tight">
-                    변호사 선임비 <span className="text-blue-500">550만 원</span>,<br />
-                    <span className="text-white border-b-4 border-blue-600">4,900원</span>에 대비하세요.
+                    변호사비 <span className="text-blue-500">300만 원</span>,<br />
+                    <span className="text-white border-b-4 border-blue-600">4,900원</span>으로 끝내세요.
                 </h1>
 
                 <p className="text-lg text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
                     전세 사기부터 교통사고까지. 언제 터질지 모르는 법적 문제,<br />
-                    <strong className="text-white">로픽(LawPick) 멤버십</strong>으로 미리 예방하세요.
+                    <strong className="text-slate-200">로픽 멤버십, 업계 유일의 '즉시 보상 시스템' 도입.</strong>
                 </p>
 
                 {/* 3가지 핵심 기능 - 히어로 바로 아래 */}
@@ -112,16 +112,16 @@ export default function Home() {
                     </div>
                     <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20 text-left">
                         <Lock className="text-yellow-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-                        <h3 className="font-bold text-xl mb-2 text-white">02. 내용증명 발송</h3>
+                        <h3 className="font-bold text-xl mb-2 text-white">02. 강력한 법적 경고장 발송</h3>
                         <p className="text-slate-400 text-sm leading-relaxed">
-                            변호사 명의의 경고장으로 상대방을 압박하여 소송 전 분쟁을 조기에 종결합니다.
+                            최신 판례 데이터가 적용된 AI 법률 서면으로 상대방을 압박하여 분쟁을 끝냅니다.
                         </p>
                     </div>
                     <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 group hover:border-blue-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/20 text-left">
                         <CheckCircle2 className="text-blue-500 mb-4 w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-                        <h3 className="font-bold text-xl mb-2 text-white">03. 소송 비용 지원</h3>
+                        <h3 className="font-bold text-xl mb-2 text-white">03. 솔루션 실패 보상금 지급</h3>
                         <p className="text-slate-400 text-sm leading-relaxed">
-                            로픽 멤버십 회원은 소송 발생 시 규정에 따라 변호사 선임비를 지원받습니다.
+                            로픽으로 해결되지 않아 소송으로 갈 경우, 제품 성능 실패에 대한 책임으로 <strong className="text-blue-400">현금 300만 원을 즉시 페이백</strong> 해드립니다.
                         </p>
                     </div>
                 </div>
