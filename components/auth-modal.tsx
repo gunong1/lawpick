@@ -16,11 +16,142 @@ declare global {
     }
 }
 
-// [약관 데이터 유지]
+// [약관 데이터 - 전문]
 const TERMS_CONTENT = {
-    terms: `제1조 (목적)\n본 약관은 주식회사 로픽(이하 "회사")이 제공하는 서비스 이용 조건을 규정합니다... (중략)`,
-    privacy: `1. 수집 목적: 회원 식별 및 서비스 제공\n2. 수집 항목: 카카오톡 프로필 정보(닉네임, 이메일)... (중략)`,
-    marketing: `이벤트 및 혜택 알림 수신 동의...`
+    terms: `제1조 (목적)
+본 약관은 주식회사 로픽(이하 "회사")이 제공하는 AI 법률 분석 서비스(이하 "서비스")의 이용에 관한 조건과 절차, 회사와 회원 간의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.
+
+제2조 (정의)
+① "서비스"란 회사가 제공하는 AI 기반 법률 문서 분석, 위험도 진단, 내용증명 생성 등의 온라인 서비스를 의미합니다.
+② "회원"이란 본 약관에 동의하고 회원 가입을 완료한 자를 말합니다.
+③ "비회원"이란 회원 가입 없이 서비스를 이용하는 자를 말합니다.
+
+제3조 (약관의 효력 및 변경)
+① 본 약관은 서비스 화면에 게시하거나 기타의 방법으로 회원에게 공지함으로써 효력이 발생합니다.
+② 회사는 관련 법령을 위배하지 않는 범위에서 본 약관을 개정할 수 있으며, 개정 약관은 적용일자 7일 전부터 공지합니다.
+③ 회원이 개정 약관의 적용에 동의하지 않는 경우, 서비스 이용을 중단하고 탈퇴할 수 있습니다.
+
+제4조 (서비스의 제공)
+① 회사는 다음 서비스를 제공합니다.
+  1. AI 기반 계약서 및 법률 문서 위험도 분석
+  2. 사건 상황에 대한 AI 법률 진단
+  3. 내용증명 자동 생성
+  4. 기타 회사가 정하는 서비스
+② 서비스는 연중무휴 24시간 제공을 원칙으로 하나, 시스템 점검 등의 사유로 일시 중단될 수 있습니다.
+
+제5조 (회원 가입)
+① 이용자는 회사가 정한 절차에 따라 약관에 동의하고 회원 가입을 신청합니다.
+② 회사는 다음 각 호에 해당하는 경우 회원 가입을 거부할 수 있습니다.
+  1. 타인의 명의를 도용한 경우
+  2. 허위 정보를 기재한 경우
+  3. 기타 회원으로 등록하는 것이 부적절하다고 판단되는 경우
+
+제6조 (회원의 의무)
+① 회원은 서비스 이용 시 다음 행위를 하여서는 안 됩니다.
+  1. 타인의 정보를 도용하는 행위
+  2. 회사의 서비스 운영을 방해하는 행위
+  3. 서비스를 이용하여 얻은 정보를 회사의 동의 없이 상업적으로 이용하는 행위
+  4. 법령 또는 공서양속에 반하는 행위
+
+제7조 (서비스 이용의 제한)
+회사는 회원이 본 약관의 의무를 위반하거나 서비스의 정상적인 운영을 방해한 경우, 서비스 이용을 제한하거나 회원 자격을 상실시킬 수 있습니다.
+
+제8조 (면책조항)
+① 본 서비스에서 제공하는 AI 분석 결과는 참고용 정보이며, 법률적 자문이나 법적 효력을 가지지 않습니다.
+② 최종적인 법률 판단은 반드시 변호사 등 법률 전문가를 통해 확인하시기 바랍니다.
+③ 회사는 AI 분석 결과의 정확성, 완전성, 적시성을 보장하지 않으며, 이로 인한 손해에 대해 책임을 지지 않습니다.
+④ 천재지변, 시스템 장애 등 불가항력으로 인한 서비스 중단에 대해 회사는 책임을 지지 않습니다.
+
+제9조 (저작권 및 지식재산권)
+① 서비스에 포함된 모든 콘텐츠(AI 분석 알고리즘, 디자인, 텍스트 등)에 대한 저작권 및 지식재산권은 회사에 귀속됩니다.
+② 회원은 서비스를 이용하면서 얻은 정보를 회사의 사전 동의 없이 복제, 전송, 출판, 배포 등의 방법으로 이용하거나 제3자에게 제공할 수 없습니다.
+
+제10조 (분쟁 해결)
+① 본 약관과 관련하여 분쟁이 발생한 경우, 회사와 회원은 상호 협의하여 해결합니다.
+② 협의가 이루어지지 않는 경우, 관할 법원은 민사소송법에 따른 법원으로 합니다.
+
+부칙
+본 약관은 2025년 1월 1일부터 시행합니다.`,
+
+    privacy: `주식회사 로픽(이하 "회사")은 개인정보보호법 등 관련 법령에 따라 이용자의 개인정보를 보호하고, 이와 관련한 고충을 신속하고 원활하게 처리할 수 있도록 하기 위하여 다음과 같이 개인정보 처리방침을 수립·공개합니다.
+
+1. 개인정보의 수집 목적
+회사는 다음의 목적을 위하여 개인정보를 처리합니다.
+  • 회원 가입 및 관리: 회원 식별, 가입 의사 확인, 본인 확인, 서비스 부정 이용 방지
+  • 서비스 제공: AI 법률 분석, 내용증명 생성, 맞춤형 법률 정보 제공
+  • 고객 상담 및 민원 처리: 이용자 문의 응대, 불만 처리, 공지사항 전달
+  • 마케팅 및 광고 활용(선택): 이벤트 및 혜택 안내, 서비스 개선을 위한 통계 분석
+
+2. 수집하는 개인정보 항목
+  • 필수 항목
+    - 카카오 로그인 시: 카카오 프로필 정보(닉네임, 프로필 이미지), 이메일 주소
+    - 이메일 가입 시: 이름, 이메일 주소, 비밀번호(암호화 저장), 휴대폰 번호
+  • 선택 항목: 마케팅 수신 동의 여부
+  • 서비스 이용 과정에서 자동 수집되는 항목: 접속 IP, 접속 일시, 서비스 이용 기록, 기기 정보(브라우저 종류, OS)
+
+3. 개인정보의 보유 및 이용 기간
+  • 회원 탈퇴 시까지 보유 후 즉시 파기
+  • 단, 관련 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관
+    - 계약 또는 청약철회에 관한 기록: 5년 (전자상거래법)
+    - 소비자 불만 또는 분쟁 처리에 관한 기록: 3년 (전자상거래법)
+    - 접속 로그 기록: 3개월 (통신비밀보호법)
+
+4. 개인정보의 제3자 제공
+회사는 원칙적으로 이용자의 개인정보를 제3자에게 제공하지 않습니다. 다만, 다음의 경우에는 예외로 합니다.
+  • 이용자가 사전에 동의한 경우
+  • 법령에 의해 요구되는 경우 (수사기관의 적법한 요청 등)
+
+5. 개인정보의 파기
+회사는 개인정보 보유 기간의 경과, 처리 목적 달성 등 개인정보가 불필요하게 된 경우에는 지체 없이 해당 개인정보를 파기합니다.
+  • 전자적 파일: 복원 불가능한 방법으로 영구 삭제
+  • 서면 문서: 분쇄기로 분쇄 또는 소각
+
+6. 개인정보의 안전성 확보 조치
+회사는 개인정보의 안전성 확보를 위해 다음과 같은 조치를 취하고 있습니다.
+  • 비밀번호 암호화 저장 (bcrypt 등 단방향 암호화)
+  • SSL/TLS 암호화 통신
+  • 개인정보 접근 권한 최소화
+  • 정기적인 보안 점검
+
+7. 이용자의 권리
+이용자는 언제든지 자신의 개인정보에 대해 다음의 권리를 행사할 수 있습니다.
+  • 개인정보 열람 요구
+  • 오류 등이 있을 경우 정정 요구
+  • 삭제 요구
+  • 처리 정지 요구
+  • 회원 탈퇴 요구
+
+8. 쿠키의 사용
+회사는 서비스 이용 편의를 위해 쿠키를 사용할 수 있습니다. 이용자는 브라우저 설정을 통해 쿠키의 저장을 거부할 수 있으며, 이 경우 일부 서비스 이용에 제한이 있을 수 있습니다.
+
+9. 개인정보 보호책임자
+  • 담당자: 로픽 개인정보 보호팀
+  • 이메일: privacy@lawpick.kr
+
+10. 개인정보 처리방침의 변경
+본 개인정보 처리방침은 법령, 정책 또는 보안 기술의 변경에 따라 내용이 추가·삭제 및 수정될 수 있으며, 변경 시 서비스 내 공지사항을 통해 고지합니다.
+
+시행일: 2025년 1월 1일`,
+
+    marketing: `[마케팅 정보 수신 동의]
+
+주식회사 로픽은 회원님께 다음과 같은 마케팅 정보를 제공하고자 합니다.
+
+1. 수신 항목
+  • 신규 서비스 및 기능 업데이트 안내
+  • 법률 관련 유용한 정보 및 콘텐츠
+  • 이벤트, 프로모션 및 할인 혜택 안내
+  • 맞춤형 서비스 추천
+
+2. 수신 방법
+  • 이메일, 앱 푸시 알림, 카카오톡 메시지
+
+3. 수신 동의 철회
+  • 마케팅 수신 동의는 선택 사항이며, 동의하지 않아도 서비스 이용에 제한이 없습니다.
+  • 수신 동의 후에도 언제든지 마이페이지 또는 고객센터를 통해 철회할 수 있습니다.
+
+4. 개인정보 보유 기간
+  • 마케팅 목적의 개인정보는 수신 동의 철회 시 또는 회원 탈퇴 시 즉시 파기됩니다.`
 };
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialView = 'NONE' }: AuthModalProps) {
@@ -160,18 +291,30 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialView
         });
     };
 
-    // 약관 보기 화면 처리 (기존 동일)
+    // 약관 보기 화면 처리
+    // initialView로 열렸으면 닫을 때 모달 자체를 닫고, 회원가입 폼에서 열었으면 폼으로 돌아감
+    const handleTermClose = () => {
+        if (initialView !== 'NONE') {
+            // 푸터 등에서 약관만 보려고 연 경우 → 모달 자체를 닫음
+            setViewingTerm('NONE');
+            onClose();
+        } else {
+            // 회원가입 폼에서 약관을 본 경우 → 폼으로 돌아감
+            setViewingTerm('NONE');
+        }
+    };
+
     if (!isOpen) return null;
     if (viewingTerm !== 'NONE') {
         return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
                 <div className="bg-white rounded-2xl w-full max-w-md h-[500px] flex flex-col shadow-2xl">
                     <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
-                        <button onClick={() => setViewingTerm('NONE')} className="text-slate-500 hover:text-slate-800 flex items-center text-sm font-bold"><ChevronLeft className="w-5 h-5 mr-1" /> 뒤로</button>
-                        <span className="font-bold text-slate-800">{viewingTerm === 'TERMS' ? '이용약관' : '개인정보처리방침'}</span><div className="w-8"></div>
+                        <button onClick={handleTermClose} className="text-slate-500 hover:text-slate-800 flex items-center text-sm font-bold"><ChevronLeft className="w-5 h-5 mr-1" /> 뒤로</button>
+                        <span className="font-bold text-slate-800">{viewingTerm === 'TERMS' ? '이용약관' : viewingTerm === 'PRIVACY' ? '개인정보처리방침' : '마케팅 수신 동의'}</span><div className="w-8"></div>
                     </div>
-                    <div className="flex-1 p-6 overflow-y-auto bg-white custom-scrollbar"><div className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{viewingTerm === 'TERMS' ? TERMS_CONTENT.terms : TERMS_CONTENT.privacy}</div></div>
-                    <div className="p-4 border-t border-slate-100"><button onClick={() => setViewingTerm('NONE')} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors">확인했습니다</button></div>
+                    <div className="flex-1 p-6 overflow-y-auto bg-white custom-scrollbar"><div className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{viewingTerm === 'TERMS' ? TERMS_CONTENT.terms : viewingTerm === 'PRIVACY' ? TERMS_CONTENT.privacy : TERMS_CONTENT.marketing}</div></div>
+                    <div className="p-4 border-t border-slate-100"><button onClick={handleTermClose} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-colors">확인했습니다</button></div>
                 </div>
             </div>
         );

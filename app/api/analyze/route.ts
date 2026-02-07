@@ -17,8 +17,14 @@ const SYSTEM_PROMPT = `당신은 대한민국 법률 분쟁 분석 전문 AI입�
 - TRAFFIC: 교통사고
 - FAMILY: 가정/상속
 - CRIME: 형사 (사기, 폭행, 협박)
+- FRAUD: 사기 (로맨스스캠, 투자사기, 중고거래사기, 보이스피싱)
 - NOISE: 층간소음
 - OTHER: 기타
+
+⚠️ [분류 혼동 방지 규칙]
+- "빌려줬다/빌린/빌렸/대여/차용" 표현이 있으면 → MONEY(대여금). 상대방이 "투자"라고 우기더라도 의뢰인이 "빌려준 거다"라면 대여금.
+- "인스타/SNS" 단독 언급 → 로맨스스캠 아님. 로맨스스캠은 SNS만남 + 투자유인 + 금전요구 3가지 모두 해당해야 함.
+- "권리금" + "건물주/재계약" → RENTAL(상가임대차), FRAUD 아님.
 
 ⚠️⚠️⚠️ [역할 판단 - 매우 중요!!!] ⚠️⚠️⚠️
 
@@ -79,10 +85,13 @@ export async function POST(req: Request) {
         const legalKeywords = [
             // 금전/채권
             '돈', '원', '만원', '억', '빌려', '갚', '못 받', '안 받', '안 줘', '못 줘', '채무', '채권', '변제',
-            // 임대차
+            // 임대차/상가
             '보증금', '월세', '전세', '집주인', '세입자', '임대', '임차', '명도', '퇴거', '계약',
+            '권리금', '상가', '건물주', '재계약', '만기', '프랜차이즈', '영업권', '갱신',
             // 사기/범죄
             '사기', '피해', '고소', '고발', '경찰', '수사', '범죄', '폭행', '협박', '횡령', '배임',
+            // 로맨스스캠/투자사기
+            '코인', '거래소', '수익률', '출금', '입금', '세금', '자금세탁', '해외계좌', '결혼', '교포',
             // 노동
             '월급', '임금', '급여', '알바', '체불', '해고', '퇴직금', '노동',
             // 명예훼손
@@ -153,6 +162,38 @@ export async function POST(req: Request) {
                 actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : ['전문가 상담 권장']
             };
 
+            // =====================================================
+            // [Post-AI 분류 보정] 대여금 vs 투자사기/로맨스스캠 혼동 방지
+            // =====================================================
+            const isLendingCase = /빌려줬|빌려줌|빌렸|빌린|차용|갚으라고|갚아|대여금|돌려줄게/.test(content);
+            const isInvestmentOrFraudLabel = /투자.*사기|로맨스|스캠|폰지|FRAUD/i.test(analysisData.caseBrief || '');
+
+            if (isLendingCase && isInvestmentOrFraudLabel) {
+                console.log('[Post-AI Override] Lending keywords detected, correcting FRAUD→MONEY classification');
+                // 금액 재추출
+                let correctedMoney = '해당 없음';
+                const moneyFix = content.match(/(\d+)\s*억\s*(\d*\s*천)?\s*만?\s*원|(\d+)\s*천\s*만\s*원|(\d+)\s*백\s*만\s*원|(\d{1,3}(?:,\d{3})*)\s*만\s*원|(\d+)\s*억/);
+                if (moneyFix) correctedMoney = moneyFix[0];
+
+                analysisData.type = 'CRITICAL';
+                analysisData.score = 85;
+                analysisData.caseBrief = `대여금 반환 청구 사안 (상대방이 '투자'라고 주장하나, 의뢰인은 '빌려준 것'으로 진술)${correctedMoney !== '해당 없음' ? ` (대여금: ${correctedMoney})` : ''}`;
+                analysisData.legalCategories = ['대여금반환청구', '사기죄(용도사기)', '강제집행'];
+                analysisData.keyFacts = {
+                    ...analysisData.keyFacts,
+                    who: '의뢰인: 채권자(돈을 빌려준 사람) / 상대방: 채무자(돈을 빌린 사람)',
+                    money: correctedMoney
+                };
+                analysisData.actionItems = [
+                    '카카오톡 대화 내용(변제약속) 캡처·공증 → 핵심 증거',
+                    '계좌이체 내역서 확보 (금전 지급 사실 증명)',
+                    '상대방의 "투자" 주장은 법적으로 인정되기 어려움 — 차용 약속(원금보장+이자+변제기 약속)은 대여의 전형적 요소',
+                    '상대방이 빌린 돈을 약속한 용도(사업)에 쓰지 않고 명품·골프 등에 사용했다면 용도사기(형법 제347조) 형사고소 가능',
+                    '내용증명 발송 후 지급명령 또는 민사소송(대여금반환청구) 진행',
+                    '상대방 재산 파악 후 가압류 신청 (은닉 방지)'
+                ];
+            }
+
             return Response.json({ success: true, data: analysisData });
 
         } catch (aiError) {
@@ -182,8 +223,13 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
     let caseBrief = '';
     let money = '해당 없음';
 
-    // 금액 추출
+    // 금액 추출 (한글 수사 + 숫자 모두 지원)
     const moneyPatterns = [
+        // 한글 수사 패턴: "1억 5천만 원", "2천만 원", "3백만 원"
+        /(\d+)\s*억\s*(\d*\s*천)?\s*만?\s*원/g,
+        /(\d+)\s*천\s*만\s*원/g,
+        /(\d+)\s*백\s*만\s*원/g,
+        // 숫자 패턴: "2500만 원", "600만 원"
         /(\d{1,3}(?:,\d{3})*)\s*만\s*원/g,
         /(\d+)\s*억/g,
         /(\d{1,3}(?:,\d{3})*)\s*원/g
@@ -192,6 +238,7 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
     for (const pattern of moneyPatterns) {
         const match = content.match(pattern);
         if (match) {
+            // 가장 큰 금액을 선택 (여러 금액이 언급된 경우)
             money = match[0];
             break;
         }
@@ -239,6 +286,22 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
             '집주인 상대 사기죄 형사고소 검토'
         ];
     }
+    // 1-2. 상가 권리금 분쟁 (권리금 + 건물주/재계약 거부)
+    else if (/권리금/.test(content) && /건물주|임대인|재계약|갱신|만기|나가|비워|명도/.test(content)) {
+        type = 'CRITICAL';
+        score = 90;
+        categories = ['권리금회수방해금지', '계약갱신요구권', '손해배상청구'];
+        who = '의뢰인: 임차인(상가세입자) / 상대방: 임대인(건물주)';
+        caseBrief = `상가 권리금 회수 방해 및 계약갱신 거절 사안${money !== '해당 없음' ? ` (권리금: ${money})` : ''}`;
+        actionItems = [
+            '⚠️ 상가건물 임대차보호법 제10조의4에 따라 건물주의 권리금 회수 방해는 위법 — 즉시 내용증명 발송',
+            '권리금 계약서, 인테리어 투자 내역, 매출자료 등 권리금 산정 증거 확보',
+            '"권리금 인정 안 함" 특약은 상가임대차보호법 제15조(강행규정)에 의해 무효 가능성 높음',
+            '건물주가 정당한 사유 없이 신규 임차인과 계약 거절 시 권리금 상당 손해배상 청구 가능',
+            '대한법률구조공단 또는 상가임대차분쟁조정위원회에 조정 신청 검토',
+            '소멸시효 3년 내 손해배상청구 소송 준비'
+        ];
+    }
     // 2. 임대차 - 세입자가 의뢰인 (일반 보증금 반환)
     else if (isTenantAsClient || ((/보증금|전세/.test(content)) && !isLandlordAsClient)) {
         type = 'WARNING';
@@ -267,8 +330,8 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
             '명도소송 소장 작성 준비'
         ];
     }
-    // 4. 투자 사기 / 폰지 사기 / 다단계 (투자 관련 키워드 우선)
-    else if (/투자|원금.*보장|수익.*보장|확정.*수익|폰지|다단계|코인|비트코인|리딩방|퇴직금.*투자/.test(content) && /사기|피해|못.*받|안.*줘|잠적|연락.*안|동결/.test(content)) {
+    // 4. 투자 사기 / 폰지 사기 / 다단계 - ★빌려줬/차용 있으면 대여금으로 제외★
+    else if (/투자|원금.*보장|수익.*보장|확정.*수익|폰지|다단계|코인|비트코인|리딩방|퇴직금.*투자/.test(content) && /사기|피해|못.*받|안.*줘|잠적|연락.*안|동결/.test(content) && !/빌려줬|빌려줌|빌렸|빌린|빌려준|차용|대여금|갚/.test(content)) {
         type = 'CRITICAL';
         score = 90;
         categories = ['사기죄', '유사수신행위', '형사고소'];
@@ -282,7 +345,23 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
             '피의자 재산 가압류 신청 (도주/은닉 방지)'
         ];
     }
-    // 5. 온라인 사기 / 중고거래 사기 (플랫폼 키워드 또는 물품거래 키워드 필수)
+    // 5. 로맨스 스캠 / 투자 유인 사기 (SNS 만남 + 투자/코인 + 입금) - ★빌려줬/차용 있으면 제외★
+    else if (/인스타|SNS|페이스북|카카오|텔레그램|소개팅|채팅/.test(content) && /코인|거래소|투자|수익|출금|입금|자금|해외.*계좌|비트코인/.test(content) && /사기|피해|돈.*날|못.*받|세금.*입금|추가.*입금|동결|묶여|느낌.*쎄|수상|의심/.test(content) && !/빌려줬|빌려줌|빌렸|빌린|빌려준|차용|대여금|갚/.test(content)) {
+        type = 'CRITICAL';
+        score = 95;
+        categories = ['사기죄(로맨스스캠)', '전자금융사기', '형사고소'];
+        who = '의뢰인: 피해자 / 상대방: 피의자(로맨스스캠 가해자)';
+        caseBrief = `로맨스 스캠(투자 유인 사기) 피해 의심 사안${money !== '해당 없음' ? ` (피해액: ${money})` : ''}`;
+        actionItems = [
+            '⚠️ 추가 입금 절대 금지 (세금/수수료 명목 요구는 전형적 2차 사기 수법)',
+            '경찰서 사이버수사대에 즉시 사기죄로 고소장 접수',
+            '상대방과의 대화 내역(인스타, 카카오 등) 전부 캡처 보존',
+            '입금한 계좌 및 거래소 사이트 URL 기록',
+            '금융감독원(1332)에 불법 금융 사기 신고',
+            '은행에 계좌 지급정지 요청 (사기이용계좌)'
+        ];
+    }
+    // 5-2. 온라인 사기 / 중고거래 사기 (플랫폼 키워드 또는 물품거래 키워드 필수)
     else if (/중고나라|당근|번개|마켓|거래|판매|구매|물건|상품|배송/.test(content) && /사기|입금.*차단|물건.*안|잠적|먹튀|연락.*두절|차단/.test(content)) {
         type = 'CRITICAL';
         score = 88;
@@ -296,7 +375,29 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
             money !== '해당 없음' ? `피해액 ${money}에 대한 민사 소송 준비` : '피해액 산정 후 민사 소송 검토'
         ];
     }
-    // 5. 용역비 / 프리랜서 미지급 (노동법 적용 X, 민사)
+    // 5-3. 대여금 (돈을 빌려줬는데 안 갚는 경우 - 투자가 아닌 대여)
+    else if (/빌려줬|빌려줌|빌렸|빌린|빌려준|차용|대여금/.test(content) && /안.*갚|안.*줘|못.*받|안.*줌|배째|돌려줄.*없|잠적|사기|갚을.*돈/.test(content)) {
+        type = 'CRITICAL';
+        score = 85;
+        categories = ['대여금반환청구', '지급명령', '강제집행'];
+        who = '의뢰인: 채권자(돈을 빌려준 사람) / 상대방: 채무자(돈을 빌린 사람)';
+        caseBrief = `대여금 반환 청구 사안${money !== '해당 없음' ? ` (대여금: ${money})` : ''}`;
+
+        // 상대방이 "투자"라고 주장하는 경우 추가 안내
+        const claimsInvestment = /투자.*아니냐|투자한.*거|투자.*주장|투자라고/.test(content);
+        const hasKakaoEvidence = /카톡|카카오|문자|메시지|대화.*내역/.test(content);
+        const suspectedFraud = /명품|골프|사치|인스타.*명품|용도.*사기|돈.*안.*쓴/.test(content);
+
+        actionItems = [
+            hasKakaoEvidence ? '카카오톡 대화 내용(변제약속, 원금보장 등) 캡처·공증 → 핵심 증거' : '변제 약속 관련 증거(문자, 녹음, 메신저 등) 확보',
+            '계좌이체 내역서 출력·확보 (금전 지급 사실 증명)',
+            claimsInvestment ? '★ 상대방의 "투자" 주장 반박: 원금보장+이자약속+변제기 합의가 있었다면 법적으로 대여(소비대차)이지 투자가 아님' : '차용증 없어도 이체내역+대화내용으로 대여 사실 입증 가능',
+            suspectedFraud ? '★ 용도사기 의심: 빌린 돈을 약속 용도(사업)에 안 쓰고 사적으로 사용했다면 형법 제347조 사기죄로 형사고소 가능' : '상대방이 빌린 돈을 약속한 용도에 쓰지 않았다면 용도사기(형법 제347조) 형사고소 검토',
+            '내용증명 발송 → 지급명령(법원) 또는 민사소송(대여금반환청구) 진행',
+            '상대방 재산 파악 후 가압류 신청 (재산 은닉·도주 방지)'
+        ];
+    }
+    // 6. 용역비 / 프리랜서 미지급 (노동법 적용 X, 민사)
     else if (/프리랜서|외주|용역|잔금|외주비|제작비|디자인비|개발비/.test(content) && /미지급|안 줘|못 받|안 줌/.test(content)) {
         type = 'CRITICAL';
         score = 78;
@@ -311,7 +412,7 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
             money !== '해당 없음' ? `${money} 청구 민사소송 검토` : '청구액 산정 후 소송 검토'
         ];
     }
-    // 6. 임금체불 (근로자 - 노동법 적용)
+    // 7. 임금체불 (근로자 - 노동법 적용)
     else if (/알바|월급|임금|급여|퇴직금/.test(content) && /안 줘|못 받|밀려|체불|미지급/.test(content)) {
         type = 'CRITICAL';
         score = 80;
@@ -325,8 +426,8 @@ function getFallbackAnalysis(content: string): DetailedAnalysis {
             '법원 지급명령 신청 검토'
         ];
     }
-    // 7. 명예훼손/악플
-    else if (/욕|악플|명예훼손|모욕|비방|걸레|SNS|인스타/.test(content)) {
+    // 8. 명예훼손/악플 (인스타/SNS 단독은 제외 - 로맨스스캠과 충돌 방지)
+    else if (/욕|악플|명예훼손|모욕|비방|걸레/.test(content) || (/SNS|인스타|게시물|댓글/.test(content) && /욕|비방|모욕|명예훼손|허위/.test(content))) {
         type = 'WARNING';
         score = 65;
         categories = ['명예훼손', '모욕죄', '손해배상'];
